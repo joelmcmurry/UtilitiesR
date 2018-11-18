@@ -108,7 +108,7 @@ subset.time.varying <- function(dt, by.vars, vars.to.keep, vars.new.names=NULL, 
   year.list <- unique(unlist(lapply(colnames(dt), function(x) substr(x, nchar(x)-3, nchar(x)))))
   
   # keep only variables of form "varname_YEAR"
-  vars.to.keep.underscore.year <- paste0(paste0(vars.to.keep,"_"), rep(year.list, times=length(vars.to.keep)))
+  vars.to.keep.underscore.year <- outer(paste0(vars.to.keep,"_"), year.list, FUN="paste0")
   
   # identify variables to keep with year appended 
   vars.to.keep.years <- colnames(dt)[grep(paste0("^",vars.to.keep.underscore.year, collapse="|"), colnames(dt), perl=TRUE)]
