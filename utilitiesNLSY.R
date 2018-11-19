@@ -14,7 +14,7 @@ library(haven)
 ## Grep Column Names
 
 get.cols <- function(strings, dt){
-  colnames(dt)[grep(strings, colnames(dt))]
+  colnames(dt)[grep(paste0(strings,collapse="|"), colnames(dt))]
 }
 
 # strip 2-digit redundant year
@@ -140,4 +140,78 @@ subset.time.varying <- function(dt, by.vars, vars.to.keep, vars.new.names=NULL, 
   }
 
   return(dt.time.varying)
+}
+
+## NLSY97 Schooling History
+
+# create school history dataset, with one row per student/year/school
+gen.schooling.hist.97 <- function(dt, by.vars, school.num.vars.to.keep, school.num.vars.new.names=NULL, nest.loop.vars.to.keep, nest.loop.vars.new.names=NULL, by.vars.new.names=NULL){
+
+  ## School Number Level Variables
+  
+  # melt school number variables and extract year, school, number, and variable name
+  dt.school.num.l <- melt(dt[, c(by.vars, get.cols(school.num.vars.to.keep, dt)), with=FALSE], id.vars=by.vars, variable.factor=FALSE)
+  dt.school.num.l[, year:=as.numeric(substr(variable, nchar(variable)-3, nchar(variable)))]
+  dt.school.num.l[, school.num:=as.numeric(substr(variable, nchar(variable)-6, nchar(variable)-5))]
+  dt.school.num.l[, var.name:=substr(variable, 1, nchar(variable)-8)]
+  
+  # correct 1997 values if needed
+  dt.school.num.l[year==1997 & is.na(school.num), var.name:=substr(variable, 1, nchar(variable)-5)]
+  dt.school.num.l[year==1997 & is.na(school.num), school.num:=01]
+  
+  # cast back to one row per student/year/school and change variable names
+  dt.school.num <- dcast(dt.school.num.l[, c(by.vars, "year","school.num","var.name","value"), with=FALSE], as.formula(paste0(by.vars," + year + school.num ~ var.name")))
+  setnames(dt.school.num, old=school.num.vars.to.keep, new=school.num.vars.new.names)
+  
+  ## Loop Number Level Variables
+  
+  # melt loop number variables and extract year, school, loop number, and variable name
+  dt.loop.num.l <- melt(dt[, c(by.vars, get.cols(nest.loop.vars.to.keep, dt)), with=FALSE], id.vars=by.vars, variable.factor=FALSE)
+  dt.loop.num.l[, year:=as.numeric(substr(variable, nchar(variable)-3, nchar(variable)))]
+  dt.loop.num.l[, loop.num:=as.numeric(substr(variable, nchar(variable)-6, nchar(variable)-5))]
+  dt.loop.num.l[, school.num:=as.numeric(substr(variable, nchar(variable)-9, nchar(variable)-8))]
+  dt.loop.num.l[, var.name:=substr(variable, 1, nchar(variable)-11)]
+  
+  # correct 1997 values if needed
+  dt.loop.num.l[year==1997, var.name:=substr(variable, 1, nchar(variable)-8)]
+  dt.loop.num.l[year==1997, loop.num:=01]
+  dt.loop.num.l[year==1997, school.num:=01]
+  
+  # cast back to one row per student/year/school and change variable names (post 1997)
+  dt.loop.num <- dcast(dt.loop.num.l[, c(by.vars, "year","school.num","loop.num","var.name","value"), with=FALSE], 
+                       as.formula(paste0(by.vars," + year + school.num + loop.num ~ var.name")))
+  setnames(dt.loop.num, old=nest.loop.vars.to.keep, new=nest.loop.vars.new.names)
+
+  ## Merge Datasets
+  
+  dt.school.loop <- merge(dt.school.num, dt.loop.num, by=c(by.vars, "year", "school.num"), all.x=TRUE)
+
+  # drop rows with empty school number variables and empty loop variables
+  dt.school.loop[, drop.flag:=1]
+  
+  if (is.null(school.num.vars.new.names)){
+    school.num.vars.new.names = school.num.vars.to.keep
+  }
+  
+  if (is.null(nest.loop.vars.new.names)){
+    school.num.vars.new.names = school.num.vars.to.keep
+  }
+  
+  # keep non-empty schooling variables in first loop or non-empty loop variables
+  for (var in school.num.vars.new.names){
+    dt.school.loop[!is.na(get(var)) & loop.num==1, drop.flag:=0]
+  }
+
+  # keep first school or non-empty loops
+  for (var in nest.loop.vars.new.names){
+    dt.school.loop[!is.na(get(var)), drop.flag:=0]
+  }
+  
+  dt.school.loop.out <- dt.school.loop[drop.flag==0, -c("drop.flag")]
+  
+  if (!is.null(by.vars.new.names)){
+    setnames(dt.school.loop.out, old=by.vars, new=by.vars.new.names)
+  }
+  
+  return(dt.school.loop.out)
 }
