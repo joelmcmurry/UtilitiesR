@@ -135,8 +135,8 @@ reg.2SLS <- function(dt, outcome.var, treatment.var, instrument.var, regressors,
 ## Regression Output
 
 # stargazer regression table
-print.reg.out <- function(model, se=NULL, title="", outcome.labels="", cov.labels="", omit.list=c(), add.lines=c(), 
-                          file.name="outFile.tex", file.path="noprint", font.size="small", single.row=FALSE){
+print.reg.out <- function(model, se=NULL, title="", outcome.labels=NULL, cov.labels=NULL, omit.list=c(), add.lines=c(), 
+                          file.name="outFile.tex", file.path="noprint", font.size="small", single.row=FALSE, order=NULL){
   
   # define path
   if (file.path=="noprint"){
@@ -152,13 +152,13 @@ print.reg.out <- function(model, se=NULL, title="", outcome.labels="", cov.label
             omit=omit.list,
             add.lines = add.lines,
             keep.stat=c("n","rsq"), 
-            column.sep.width="0pt", font.size="small", out=out.file, single.row=single.row)
+            column.sep.width="0pt", font.size="small", out=out.file, single.row=single.row, order=order)
   
 }
 
 # stargazer regression table that dynamically selects covariate labels
-print.reg.out.auto.label <- function(model, auto.label.list, se=NULL, title="", outcome.labels="", omit.list=c(), add.lines=c(), 
-                                     file.name="outFile.tex", file.path="noprint", font.size="small", single.row=FALSE){
+print.reg.out.auto.label <- function(model, auto.label.list, se=NULL, title="", outcome.labels=NULL, omit.list=c(), add.lines=c(), 
+                                     file.name="outFile.tex", file.path="noprint", font.size="small", single.row=FALSE, no.label=0, order=NULL){
   
   # unpack objects from passed auto.label.list
   dt <- auto.label.list[[1]]
@@ -170,24 +170,24 @@ print.reg.out.auto.label <- function(model, auto.label.list, se=NULL, title="", 
   # generate length of covariates in each model
   cov.length <- lapply(model, function(x) length(rownames(x$coefficients)))
   
-  # pick labelling algo depending on if models all have same length or not
-  if (min(unlist(cov.length))==max(unlist(cov.length))){
-    list.to.keep <- list()
-    for (i in 1:length(model)){
-      list.to.keep[[i]] <- rownames(model[[i]]$coefficients)
-    }
-    list.to.keep <- setdiff(unique(unlist(list.to.keep)), omit.list)
-  } else {
-    # list of covariates to keep
-    list.to.keep <- setdiff(rownames(model[[which.max(lapply(model, function(x) length(rownames(x$coefficients))))]]$coefficients), omit.list)
+  list.to.keep <- list()
+  for (i in 1:length(model)){
+    list.to.keep[[i]] <- rownames(model[[i]]$coefficients)
   }
+  list.to.keep <- setdiff(unique(unlist(list.to.keep)), c(omit.list, "(Intercept)"))
   
   # general covariate labels
-  cov.labels <- match.cov.labels(dt, covariate.list, covariate.labels, mult.discrete.covariate.list, mult.discrete.covariate.labels, list.to.keep)
+  if (no.label==1){
+    cov.labels <- NULL
+  } else {
+    cov.labels <- match.cov.labels(dt, covariate.list, covariate.labels, mult.discrete.covariate.list, mult.discrete.covariate.labels, list.to.keep)
+  }
   
   # print table
   print.reg.out(model, se=se, title=title, outcome.labels=outcome.labels, cov.labels=cov.labels, omit.list=omit.list, add.lines=add.lines, 
-                file.name=file.name, file.path=file.path, font.size=font.size, single.row=single.row)
+                file.name=file.name, file.path=file.path, font.size=font.size, single.row=single.row, 
+                order=paste0("\\b",list.to.keep,"\\b"))
+  
 }
 
 # match covariate labels to retained covariates in stargazer table
@@ -212,12 +212,12 @@ match.cov.labels <- function(dt, covariate.list, covariate.labels, mult.discrete
   # create list of all multiple discrete variable labels and value labels
   mult.var.val.label <- list()
   for (i in 1:length(mult.discrete.covariate.list)){
-    mult.var.val.label[[i]] <- paste0(mult.var.label[[i]], unlist(mult.discrete.covariate.labels[[i]]))
+    mult.var.val.label[[i]] <- paste0(mult.var.label[[i]], sort(unlist(mult.discrete.covariate.labels[[i]])))
   }
   
   ## Lead/Lag Variables
   
-  # extract lits of lead/lagged variable names
+  # extract list of lead/lagged variable names
   lead.names <- colnames(dt)[grep(paste(paste0(covariate.list,".lead"),collapse="|"), colnames(dt))]
   lag.names <- colnames(dt)[grep(paste(paste0(covariate.list,".lag"),collapse="|"), colnames(dt))]
   
@@ -251,6 +251,7 @@ match.cov.labels <- function(dt, covariate.list, covariate.labels, mult.discrete
   full.name.list.with.inter <- c(full.name.list, all.inter)
   
   full.label.list.with.inter <- c(full.label.list, all.inter.labels)
+  
   ## Retain Labels for Selected Names
   
   out.label.list <- full.label.list.with.inter[match(list.to.keep, full.name.list.with.inter)]
@@ -268,7 +269,7 @@ gen.mult.var.val.combo <- function(dt, regressors.discrete){
   discrete.var.combo <- list()
   
   for (i in 1:length(regressors.discrete)){
-    discrete.var.combo[[i]] <- paste0(regressors.discrete[[i]], unlist(discrete.var.val.list[[i]]))
+    discrete.var.combo[[i]] <- sort(paste0(regressors.discrete[[i]], unlist(discrete.var.val.list[[i]])))
   }
   
   # collapse discrete name/value combinations and append to covariate list (ignore NA)
