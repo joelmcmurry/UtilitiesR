@@ -157,7 +157,7 @@ print.reg.out <- function(model, se=NULL, title="", outcome.labels="", cov.label
 }
 
 # stargazer regression table that dynamically selects covariate labels
-print.reg.out.auto.label <- function(model, se=NULL, title="", outcome.labels="", auto.label.list, omit.list=c(), add.lines=c(), 
+print.reg.out.auto.label <- function(model, auto.label.list, se=NULL, title="", outcome.labels="", omit.list=c(), add.lines=c(), 
                                      file.name="outFile.tex", file.path="noprint", font.size="small", single.row=FALSE){
   
   # unpack objects from passed auto.label.list

@@ -24,6 +24,24 @@ get.cols <- function(strings.look, dt, strings.exclude=NULL){
   
 }
 
+# function that sources folder
+sourceEntireFolder <- function(folderName, verbose=FALSE, showWarnings=TRUE){ 
+  files <- list.files(folderName, full.names=TRUE)
+  
+  # Grab only R files
+  files <- files[ grepl("\\.[rR]$", files) ]
+  
+  if (!length(files) && showWarnings)
+    warning("No R files in ", folderName)
+  
+  for (f in files) {
+    if (verbose)
+      cat("sourcing: ", f, "\n")
+    try(source(f, local=FALSE, echo=FALSE), silent=!verbose)
+  }
+  return(invisible(NULL))
+}
+
 ##########################################################################################################
 ## Data Manipulation
 
@@ -119,4 +137,34 @@ run.var <- function(dt, var.name, by.vars, time.vars, start.var=NULL){
   
   dt[, temp_col:=NULL]
   dt[, temp_start_var:=NULL]
+}
+
+# flag quantile of variable by group and tag whether above/below median
+flag.quantile <- function(dt, var.name, class.vars, by.vars=NULL, quantile.n=2, tag.median=TRUE){
+  
+  # retain at (class vars, by vars) level
+  dt.for.analysis <- unique(dt[, c(class.vars, by.vars, var.name), with=FALSE])
+
+  # flag quantiles
+  dt.for.analysis[, temp_var_to_flag:=dt.for.analysis[, var.name, with=FALSE]]
+
+  dt.for.analysis[!is.na(temp_var_to_flag), temp_quantile:=cut(temp_var_to_flag, 
+                                       unique(quantile(temp_var_to_flag, probs=seq(0,1,1/quantile.n), na.rm=TRUE)),
+                                                 include.lowest=TRUE, labels=FALSE), by=by.vars]
+
+  # nullify quantiles that are out of range (due to insufficient observations)
+  dt.for.analysis[!temp_quantile %in% seq(1,quantile.n), temp_quantile:=NA]
+  
+  # merge into main dataset
+  dt.out <- merge(dt, dt.for.analysis[,c(class.vars,by.vars,"temp_var_to_flag","temp_quantile"), with=FALSE], by=c(class.vars, by.vars))
+  dt.out[, (paste0(var.name,".quantile")):=as.factor(temp_quantile)]
+  
+  if (tag.median){
+   dt.out[, (paste0(var.name,".above.med")):=as.numeric(temp_quantile>(quantile.n/2))]
+  }
+
+  dt.out[, temp_var_to_flag:=NULL]
+  dt.out[, temp_quantile:=NULL]
+  
+  return(dt.out)
 }

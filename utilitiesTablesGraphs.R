@@ -7,6 +7,8 @@
 library(data.table)
 library(stargazer)
 library(xtable)
+library(ggplot2)
+library(tikzDevice)
 library(haven)
 library(plyr)
 
@@ -14,6 +16,23 @@ library(plyr)
 ## Source Dependencies
 
 source("utilitiesMisc.R")
+
+##########################################################################################################
+## General
+
+# print object
+print.object <- function(obj.to.print, picDir, fileTitle="PRINTOBJECT", width=5.25, height=3, type="tikz"){
+  
+  if (type=="tikz"){
+    tikz(file=paste0(picDir,"/",fileTitle,".tex"),width=width,height=height)
+    print(obj.to.print)
+    dev.off()
+  } else if (type=="png"){
+    png(file=paste0(picDir,"/",fileTitle,".png"))
+    print(obj.to.print)
+    dev.off()
+  }
+}
 
 ##########################################################################################################
 ## Tables
@@ -60,7 +79,7 @@ print.xtab <- function(tab, cols.to.keep, col.labels, title){
 }
 
 ##########################################################################################################
-## Graphs
+## Graphs - Basic
 
 # histograms
 plot.hist <- function(dt, var.name, binwidth=NULL, title="", xlab="", ylab=""){
@@ -77,6 +96,8 @@ plot.hist <- function(dt, var.name, binwidth=NULL, title="", xlab="", ylab=""){
   
   dt[, col_to_graph:=NULL]
   dt[, temp_col:=NULL]
+  
+  return(plot)
 }
 
 # plot line graph
@@ -94,4 +115,138 @@ plot.line <- function(dt, var.list, var.name.list, series.title, plot.title=NULL
     scale_linetype_manual(values=seq(1:length(unique(dt.melt$variable))), labels=var.name.list) +
     theme(legend.position = "bottom")
   print(plot)
+
+  return(plot)
+}
+
+##########################################################################################################
+## Graphs - Average Value Conditioning on Variable
+
+## Categorical Variable
+
+# function that computes mean by factor level
+compute.mean.factor <- function(dt, y.var, factor.var){
+  
+  dt[, temp_y_var:=dt[, y.var, with=FALSE]]
+  dt[, temp_factor_var:=dt[, factor.var, with=FALSE]]
+  
+  dt.mean <- dt[!is.na(temp_y_var) & !is.na(temp_factor_var), 
+                .(mean.by.factor=mean(temp_y_var)), by=.(temp_factor_var)]
+  dt.mean[, variable:=factor.var]
+  dt.mean[, value:=temp_factor_var]
+  
+  dt[, temp_y_var:=NULL]
+  dt[, temp_factor_var:=NULL]
+  
+  return(dt.mean)
+}
+
+# bar chart
+plot.bar.factor <- function(dt, y.var, factor.var, title="", xlab="", ylab=""){
+  
+  # compute mean by value
+  dt.mean <- compute.mean.factor(dt, y.var, factor.var)
+  
+  plot <- ggplot(data=dt.mean, aes(x=temp_factor_var, y=mean.by.factor)) + 
+    geom_col(color="black", fill="white") + 
+    theme_bw() + theme(legend.title=element_blank()) + 
+    labs(title=title, x=xlab, y=ylab)
+  
+  print(plot)
+  
+  return(plot)
+}
+
+# generate and print bar chart given list of inputs
+plot.print.bar.factor.list <- function(dt, picDir, input.list, no.print=0){
+  
+  y.var <- input.list[[1]]
+  factor.var <- input.list[[2]]
+  title <- input.list[[3]]
+  xlab <- input.list[[4]]
+  ylab <- input.list[[5]]
+  fileTitle <- input.list[[6]]
+  
+  plot <- plot.bar.factor(dt, y.var, factor.var, title=title, xlab=xlab, ylab=ylab)
+  
+  if (no.print==0){
+    print.object(plot, picDir, fileTitle=fileTitle)
+  }
+  
+}
+
+# bar chart with multiple categorial variables grouped
+plot.bar.factor.mult <- function(dt, y.var, factor.var.list, factor.label.list, title="", xlab="", ylab=""){
+  
+  dt.mean.list <- lapply(factor.var.list, compute.mean.factor, dt=dt, y.var=y.var)
+  
+  dt.mean <- rbindlist(dt.mean.list)
+  dt.mean[, variable.label:=factor.label.list[match(variable,factor.var.list)]]
+  
+  plot <- ggplot(data=dt.mean, aes(x=variable.label, y=mean.by.factor, group=value)) + 
+    geom_col(position="dodge", color="black", fill="white") + 
+    theme_bw() + theme(legend.title=element_blank()) + 
+    labs(title=title, x=xlab, y=ylab)
+  
+  print(plot)
+  
+  return(plot)
+}
+
+# generate and print bar chart with multiple given list of inputs
+plot.print.bar.factor.mult.list <- function(dt, picDir, input.list, no.print=0){
+  
+  y.var <- input.list[[1]]
+  factor.var.list <- input.list[[2]]
+  factor.label.list <- input.list[[3]]
+  title <- input.list[[4]]
+  xlab <- input.list[[5]]
+  ylab <- input.list[[6]]
+  fileTitle <- input.list[[7]]
+  
+  plot <- plot.bar.factor.mult(dt, y.var, factor.var.list, factor.label.list, title=title, xlab=xlab, ylab=ylab)
+  
+  if (no.print==0){
+    print.object(plot, picDir, fileTitle=fileTitle)
+  }
+  
+}
+
+#= Distribution Condition on Variable =#
+
+# box and whisker plot by value of conditioning variable
+plot.box.whisker.factor <- function(dt, y.var, factor.var, title="", xlab="", ylab=""){
+  
+  dt[, temp_y_var:=dt[, y.var, with=FALSE]]
+  dt[, temp_factor_var:=dt[, factor.var, with=FALSE]]
+  dt[, temp_factor_var:=as.factor(temp_factor_var)]
+  
+  plot <- ggplot(data=dt[!is.na(temp_y_var) & !is.na(temp_factor_var)], aes(x=temp_factor_var, y=temp_y_var)) + 
+    geom_boxplot() + 
+    theme_bw() + theme(legend.title=element_blank()) + 
+    labs(title=title, x=xlab, y=ylab)
+  
+  dt[, temp_y_var:=NULL]
+  dt[, temp_factor_var:=NULL]
+  
+  print(plot)
+  
+}
+
+# generate and print box and whisker given list of inputs
+plot.print.box.whisker.factor.list <- function(dt, picDir, input.list, no.print=0){
+  
+  y.var <- input.list[[1]]
+  factor.var <- input.list[[2]]
+  title <- input.list[[3]]
+  xlab <- input.list[[4]]
+  ylab <- input.list[[5]]
+  fileTitle <- input.list[[6]]
+  
+  plot <- plot.box.whisker.factor(dt, y.var, factor.var, title=title, xlab=xlab, ylab=ylab)
+  
+  if (no.print==0){
+    print.object(plot, picDir, fileTitle=fileTitle)
+  }
+  
 }
