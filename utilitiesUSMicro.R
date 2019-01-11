@@ -27,10 +27,10 @@ state.name.gen <- function(dt){
   # fill in non-contiguous
   dt[statefip==2, abb:="AK"]
   dt[statefip==15, abb:="HI"]
-
+  
   # match state names to abbreviations
   dt[, statename:=state.name[match(abb,state.abb)]]
-
+  
   # fill in DC
   dt[abb=="DC", statename:="District of Columbia"]
   return(dt)
