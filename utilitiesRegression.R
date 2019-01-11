@@ -56,27 +56,27 @@ reg.OLS.for.list <- function(dt, model.spec){
 }
 
 # OLS conditioning on value of single variable (modifies regressor list)
-reg.OLS.fix.var <- function(var.fix, fix.val, dt, outcome.var, regressors, fixed.effects, inter.list.1=c(), inter.list.2=c(), cluster.group=c()){
+reg.OLS.fix.var <- function(var.fix, fix.val, dt, outcome.var, regressors, fixed.effects="0", inter.list.1=c(), inter.list.2=c(), cluster.group=c()){
   
   # create temporary variable to fix
   dt[, temp.var.fix:=dt[, var.fix, with=FALSE]]
   
   # remove regressors and interactions without any observations
-  regressors.valid <- regressors[unlist(lapply(regressors, var.nonmissing, dt=dt[var.fix==fix.val]))]
+  regressors.valid <- regressors[unlist(lapply(regressors, var.nonmissing, dt=dt[temp.var.fix==fix.val]))]
   
   if (length(inter.list.1) > 0){
-    inter.list.1.valid <- inter.list.1[unlist(lapply(inter.list.1, var.nonmissing, dt=dt[var.fix==fix.val]))]
+    inter.list.1.valid <- inter.list.1[unlist(lapply(inter.list.1, var.nonmissing, dt=dt[temp.var.fix==fix.val]))]
   } else {
     inter.list.1.valid <- c()
   }
   
   if (length(inter.list.2) > 0){
-    inter.list.2.valid <- inter.list.2[unlist(lapply(inter.list.2, var.nonmissing, dt=dt[var.fix==fix.val]))]
+    inter.list.2.valid <- inter.list.2[unlist(lapply(inter.list.2, var.nonmissing, dt=dt[temp.var.fix==fix.val]))]
   } else {
     inter.list.2.valid <- c()
   }
   
-  model.out <- reg.OLS(dt[var.fix==fix.val], outcome.var, regressors.valid, fixed.effects, 
+  model.out <- reg.OLS(dt[temp.var.fix==fix.val], outcome.var, regressors.valid, fixed.effects=fixed.effects, 
                          inter.list.1=inter.list.1.valid, inter.list.2=inter.list.2.valid, cluster.group=cluster.group)
   
   # remove temporary variable to fix
@@ -186,7 +186,7 @@ print.reg.out.auto.label <- function(model, auto.label.list, se=NULL, title="", 
   # print table
   print.reg.out(model, se=se, title=title, outcome.labels=outcome.labels, cov.labels=cov.labels, omit.list=omit.list, add.lines=add.lines, 
                 file.name=file.name, file.path=file.path, font.size=font.size, single.row=single.row, 
-                order=paste0("\\b",list.to.keep,"\\b"))
+                order=paste0("^\\b",list.to.keep,"$\\b"))
   
 }
 
