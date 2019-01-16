@@ -81,7 +81,7 @@ log.var <- function(dt, var.name){
 }
 
 # convert nominal to real values
-convert.real <- function(dt, var.name, dt.defl, defl.var.name, base.year=2016){
+convert.real <- function(dt, var.name, dt.defl, defl.var.name, base.year=2016, replace.nom=1, year.name=0){
   setkey(dt, year)
   setkey(dt.defl, year)
   
@@ -90,10 +90,19 @@ convert.real <- function(dt, var.name, dt.defl, defl.var.name, base.year=2016){
   
   dt <- dt.defl[,.(year, temp_col_defl)][dt]
   
-  dt[, (paste0(var.name,".real")):=temp_col*dt.defl[year==base.year, temp_col_defl]/temp_col_defl]
+  if (year.name==1){
+    dt[, (paste0(var.name,".real",base.year)):=temp_col*dt.defl[year==base.year, temp_col_defl]/temp_col_defl]
+  } else {
+    dt[, (paste0(var.name,".real")):=temp_col*dt.defl[year==base.year, temp_col_defl]/temp_col_defl]
+  }
   dt[, temp_col:=NULL]
   dt[, temp_col_defl:=NULL]
-  dt[, (var.name):=NULL]
+  
+  if (replace.nom==1){
+    dt[, (var.name):=NULL]  
+  }
+  
+  return(dt)
 }
 
 # rolling average growth rate of variable

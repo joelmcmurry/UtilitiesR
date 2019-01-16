@@ -8,6 +8,11 @@ library(data.table)
 library(maps)
 
 ##########################################################################################################
+## Source Dependencies
+
+source("utilitiesMisc.R")
+
+##########################################################################################################
 ## Geographical Code Clean and Variable Generation
 
 ## Generate State Names and Fill in Non-Contiguous FIPS
