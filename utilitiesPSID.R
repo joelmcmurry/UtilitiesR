@@ -67,10 +67,10 @@ subset.time.varying <- function(dt, by.vars, vars.to.keep, by.vars.new.names=NUL
 ## Generational Linking
 
 # given respondent-level dataset and family linking file, link select parent or child variables to respondent
-psid.family.link.two.gen <- function(dt.respondent, dt.fims, dt.rel.to.head, 
-                                     hh.vars.to.link=c(), indiv.vars.to.link=c(),
+psid.family.link.two.gen <- function(dt.respondent, dt.fims, dt.head.wife, 
+                                     hh.vars.to.link=c(), indiv.vars.to.link=NULL,
                                      by.vars="year", relation="childtoparent", 
-                                     retain.hw.only=1, n.split.groups=20){
+                                     nullify.non.hw=0, n.split.groups=20){
   
   # create key and field ID, generate field variable names, and set field generation identifier
   if (relation=="childtoparent"){
@@ -78,24 +78,42 @@ psid.family.link.two.gen <- function(dt.respondent, dt.fims, dt.rel.to.head,
     ID68PN.field <- "ID68PN.parent"
     
     hh.vars.to.link.key <- paste0(hh.vars.to.link,".child")
-    indiv.vars.to.link.key <- paste0(indiv.vars.to.link,".child")
     
-    vars.to.link <- c(hh.vars.to.link,indiv.vars.to.link)
-    vars.to.link.key <- c(hh.vars.to.link.key,indiv.vars.to.link.key)
+    if (!is.null(indiv.vars.to.link)){
+      hh.vars.to.link.key <- paste0(hh.vars.to.link,".child")
+      indiv.vars.to.link.key <- paste0(indiv.vars.to.link,".child")
+      
+      vars.to.link <- c(hh.vars.to.link,indiv.vars.to.link)
+      vars.to.link.key <- c(hh.vars.to.link.key,indiv.vars.to.link.key)
+    } else {
+      hh.vars.to.link.key <- paste0(hh.vars.to.link,".child")
+      
+      vars.to.link <- c(hh.vars.to.link)
+      vars.to.link.key <- c(hh.vars.to.link.key)
+    }
     
     cast.var <- "parent.type.parent"
   } else if (relation=="parenttochild"){
     ID68PN.key <- "ID68PN.parent"
     ID68PN.field <- "ID68PN.child"
     
-    hh.vars.to.link.key <- paste0(hh.vars.to.link,".parent")
-    indiv.vars.to.link.key <- paste0(indiv.vars.to.link,".parent")
-    
-    vars.to.link <- c(hh.vars.to.link,indiv.vars.to.link)
-    vars.to.link.key <- c(hh.vars.to.link.key,indiv.vars.to.link.key)
-  
+    if (!is.null(indiv.vars.to.link)){
+      hh.vars.to.link.key <- paste0(hh.vars.to.link,".parent")
+      indiv.vars.to.link.key <- paste0(indiv.vars.to.link,".parent")
+      
+      vars.to.link <- c(hh.vars.to.link,indiv.vars.to.link)
+      vars.to.link.key <- c(hh.vars.to.link.key,indiv.vars.to.link.key)
+    } else {
+      hh.vars.to.link.key <- paste0(hh.vars.to.link,".parent")
+      
+      vars.to.link <- c(hh.vars.to.link)
+      vars.to.link.key <- c(hh.vars.to.link.key)
+    }
+
     cast.var <- "child.n"
   }
+  
+  ## Match Field Variables to Key Variables
   
   # merge in field IDs to key ID variables, padding for each field ID/by variable
   dt.resp.field.id <- merge(dt.respondent[, c("ID68PN",by.vars,vars.to.link), with=FALSE], 
@@ -113,31 +131,53 @@ psid.family.link.two.gen <- function(dt.respondent, dt.fims, dt.rel.to.head,
   dt.linked.l <- merge(dt.resp.field.id, dt.respondent[, c("ID68PN",by.vars,vars.to.link), with=FALSE], 
                        by.x=c(ID68PN.field,"year"), by.y=c("ID68PN","year"), all.x=TRUE)
   
-  ## Nullify Field Household Variables for Non-Head/Wife Members
+  ## Identify Interview Number and Head/Wife Flag for Key and Field IDs
   
-  # merge in relation to head dataset on field ID
-  dt.linked.l.rel <- merge(dt.linked.l, dt.rel.to.head, by.x=c(ID68PN.field,"year"), by.y=c("ID68PN","year"))
+  # merge field ID interviews and head/wife flag into matched data
+  dt.linked.l.rel.1 <- merge(dt.linked.l, dt.head.wife[,.(ID68PN,year,interview_number,head,wife)], 
+                             by.x=c(ID68PN.field,"year"), by.y=c("ID68PN","year"))
   
-  # if field ID is not a head/wife, set field household variables to NA
-  dt.linked.l.rel[!relation_to_head %in% c(1,2), (hh.vars.to.link):=NA]
+  # merge key ID interviews and head/wife flag into matched data
+  dt.linked.l.rel.2 <- merge(dt.linked.l.rel.1, dt.head.wife[,.(ID68PN,year,interview_number,head,wife)], 
+                             by.x=c(ID68PN.key,"year"), by.y=c("ID68PN","year"))
+  
+  # rename interview number and head/wife columns
+  setnames(dt.linked.l.rel.2, old=c("interview_number.x","head.x","wife.x","interview_number.y","head.y","wife.y"), 
+           new=c("interview_number.field","head.field","wife.field","interview_number.key","head.key","wife.key"))
+  
+  ## Drop Key IDs that Are Not Head/Wife
+  
+  dt.linked.l.key.hw <- dt.linked.l.rel.2[head.key==1 | wife.key==1]
+  
+  ## Nullify Field ID Variables if Field ID is in Same HH as Key ID
+  
+  dt.linked.l.key.hw[interview_number.field==interview_number.key, (hh.vars.to.link):=NA] 
+  
+  ## Option: Nullify Field ID Variables for Non-Head/Wife Members
+  
+  if (nullify.non.hw==1){
+     
+    dt.linked.l.key.hw[head.field!=1 & wife.field!=1, (hh.vars.to.link):=NA] 
+  
+  }
   
   ## Break Long dataset Up for Processing
   
-  setkeyv(dt.linked.l.rel, c(ID68PN.key, by.vars))
+  setkeyv(dt.linked.l.key.hw, c(ID68PN.key, by.vars))
   
   ## Tag Key ID with Split Groups
   
   # create temporary key ID
-  dt.linked.l.rel[, ID68PN.key.temp:=dt.linked.l.rel[, ID68PN.key, with=FALSE]]
+  dt.linked.l.key.hw[, ID68PN.key.temp:=dt.linked.l.key.hw[, ID68PN.key, with=FALSE]]
   
   # compute factor to divide sequence of IDs by to get n.split.groups
-  split.div.factor <- ceiling(length(unique(dt.linked.l.rel$ID68PN.key.temp))/n.split.groups)
+  split.div.factor <- ceiling(length(unique(dt.linked.l.key.hw$ID68PN.key.temp))/n.split.groups)
   
   # flag split group
-  dt.linked.l.rel[, split.group:=ceiling(seq_along(unique(dt.linked.l.rel$ID68PN.key.temp))/split.div.factor)[match(ID68PN.key.temp, unique(dt.linked.l.rel$ID68PN.key.temp))]]
+  dt.linked.l.key.hw[, split.group:=ceiling(seq_along(unique(dt.linked.l.key.hw$ID68PN.key.temp))/split.div.factor)[match(ID68PN.key.temp, unique(dt.linked.l.key.hw$ID68PN.key.temp))]]
   
   # split dataset into pieces
-  dt.linked.l.split <- split(dt.linked.l.rel, by="split.group")
+  dt.linked.l.split <- split(dt.linked.l.key.hw, by="split.group")
 
   # function to cast to one row per key ID/by variable
   cast.split.dt <- function(dt.l){
@@ -156,18 +196,12 @@ psid.family.link.two.gen <- function(dt.respondent, dt.fims, dt.rel.to.head,
     setnames(dt.linked.w, old=cast.cols, new=paste0(vars.to.link,"_", cast.cols))
   }
   
-  ## If Prompted, Drop Keys that Are Not Heads
+  # reset column order (rbind mixes up variables depending on split and number of field links)
+  hh.var.cols <- get.cols(paste0(hh.vars.to.link,collapse="|"),dt.linked.w)
+  indiv.var.cols <- get.cols(paste0(indiv.vars.to.link,collapse="|"),dt.linked.w)
+  other.cols <- setdiff(colnames(dt.linked.w), c(hh.var.cols, indiv.var.cols))
   
-  if (retain.hw.only==1){
-    
-    dt.linked.w.rel <- merge(dt.linked.w, dt.rel.to.head, by.x=c(ID68PN.key,"year"), by.y=c("ID68PN","year"))
-    
-    dt.linked.w.out <- dt.linked.w.rel[relation_to_head %in% c(1,2)]
-    dt.linked.w.out[, relation_to_head:=NULL]
-    dt.linked.w.out[, interview_number:=NULL]
-  } else {
-    dt.linked.w.out <- dt.linked.w
-  }
+  setcolorder(dt.linked.w, c(other.cols, hh.var.cols, indiv.var.cols))
   
-  return(dt.linked.w.out)
+  return(dt.linked.w)
 }
