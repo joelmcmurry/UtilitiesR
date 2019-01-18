@@ -56,13 +56,14 @@ reg.OLS.for.list <- function(dt, model.spec){
 }
 
 # OLS conditioning on value of single variable (modifies regressor list)
-reg.OLS.fix.var <- function(var.fix, fix.val, dt, outcome.var, regressors, fixed.effects="0", inter.list.1=c(), inter.list.2=c(), cluster.group=c()){
+reg.OLS.fix.var <- function(var.fix, fix.val, dt, outcome.var, regressors, fixed.effects="0", inter.list.1=c(), inter.list.2=c(), 
+                            cluster.group=c(), non.missing.rows=1){
   
   # create temporary variable to fix
   dt[, temp.var.fix:=dt[, var.fix, with=FALSE]]
   
   # remove regressors and interactions without any observations
-  regressors.valid <- regressors[unlist(lapply(regressors, var.nonmissing, dt=dt[temp.var.fix==fix.val]))]
+  regressors.valid <- regressors[unlist(lapply(regressors, var.nonmissing, dt=dt[temp.var.fix==fix.val], non.missing.rows=non.missing.rows))]
   
   if (length(inter.list.1) > 0){
     inter.list.1.valid <- inter.list.1[unlist(lapply(inter.list.1, var.nonmissing, dt=dt[temp.var.fix==fix.val]))]

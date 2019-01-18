@@ -46,11 +46,11 @@ sourceEntireFolder <- function(folderName, verbose=FALSE, showWarnings=TRUE){
 ## Data Manipulation
 
 # function that tests if there are non-missing cases of a variable
-var.nonmissing <- function(dt, var.name){
+var.nonmissing <- function(dt, var.name, non.missing.rows=1){
   
   dt[, temp_col:=dt[, var.name, with=FALSE]]
   
-  is.nonmiss <- (length(dt[!is.na(temp_col), temp_col]) > 0)
+  is.nonmiss <- (length(dt[!is.na(temp_col), temp_col]) > non.missing.rows)
   
   dt[, temp_col:=NULL]
   
