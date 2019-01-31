@@ -46,43 +46,43 @@ assign.bea.region <- function(dt){
   
   # by state name
   dt[statename %in% c("Connecticut","Maine","Massachusetts","New Hampshire","Rhode Island","Vermont"),
-     c("bea.region","region.flag"):=list(1,0)]
+     c("bea.region","region.flag","bea.region.name"):=list(1,0,"New England")]
   dt[statename %in% c("Delaware","District of Columbia","Maryland","New Jersey","New York","Pennsylvania"),
-     c("bea.region","region.flag"):=list(2,0)]
+     c("bea.region","region.flag","bea.region.name"):=list(2,0,"Mideast")]
   dt[statename %in% c("Illinois","Indiana","Michigan","Ohio","Wisconsin"),
-     c("bea.region","region.flag"):=list(3,0)]
+     c("bea.region","region.flag","bea.region.name"):=list(3,0,"Great Lakes")]
   dt[statename %in% c("Iowa","Kansas","Minnesota","Missouri","Nebraska","North Dakota","South Dakota"),
-     c("bea.region","region.flag"):=list(4,0)]
+     c("bea.region","region.flag","bea.region.name"):=list(4,0,"Plains")]
   dt[statename %in% c("Alabama","Arkansas","Florida","Georgia","Kentucky","Louisiana","Mississippi",
                     "North Carolina","South Carolina","Tennessee","Virginia","West Virginia"),
-     c("bea.region","region.flag"):=list(5,0)]
+     c("bea.region","region.flag","bea.region.name"):=list(5,0,"Southeast")]
   dt[statename %in% c("Arizona","New Mexico","Oklahoma","Texas"),
-     c("bea.region","region.flag"):=list(6,0)]
+     c("bea.region","region.flag","bea.region.name"):=list(6,0,"Southwest")]
   dt[statename %in% c("Colorado","Idaho","Montana","Utah","Wyoming"),
-     c("bea.region","region.flag"):=list(7,0)]
+     c("bea.region","region.flag","bea.region.name"):=list(7,0,"Rocky Mountain")]
   dt[statename %in% c("Alaska","California","Hawaii","Nevada","Oregon","Washington"),
-     c("bea.region","region.flag"):=list(8,0)]
+     c("bea.region","region.flag","bea.region.name"):=list(8,0,"Far West")]
   
   # by pre-1976 fips grouping
-  dt[statefip==70, c("bea.region","region.flag"):=list(1,0)]
-  dt[statefip==71, c("bea.region","region.flag"):=list(3,0)]
-  dt[statefip==72, c("bea.region","region.flag"):=list(4,0)]
-  dt[statefip==73, c("bea.region","region.flag"):=list(4,0)]
-  dt[statefip==74, c("bea.region","region.flag"):=list(2,0)]
-  dt[statefip==75, c("bea.region","region.flag"):=list(5,0)]
-  dt[statefip==76, c("bea.region","region.flag"):=list(5,0)]
-  dt[statefip==77, c("bea.region","region.flag"):=list(100,0)]
-  dt[statefip==78, c("bea.region","region.flag"):=list(100,0)]
-  dt[statefip==79, c("bea.region","region.flag"):=list(100,0)]
-  dt[statefip==80, c("bea.region","region.flag"):=list(100,0)]
-  dt[statefip==81, c("bea.region","region.flag"):=list(100,0)]
-  dt[statefip==83, c("bea.region","region.flag"):=list(100,0)]
-  dt[statefip==84, c("bea.region","region.flag"):=list(100,0)]
-  dt[statefip==85, c("bea.region","region.flag"):=list(100,0)]
-  dt[statefip==87, c("bea.region","region.flag"):=list(100,0)]
-  dt[statefip==88, c("bea.region","region.flag"):=list(100,0)]
-  dt[statefip==89, c("bea.region","region.flag"):=list(100,0)]
-  dt[statefip==90, c("bea.region","region.flag"):=list(100,0)]
+  dt[statefip==70, c("bea.region","region.flag","bea.region.name"):=list(1,0,"New England")]
+  dt[statefip==71, c("bea.region","region.flag","bea.region.name"):=list(3,0,"Great Lakes")]
+  dt[statefip==72, c("bea.region","region.flag","bea.region.name"):=list(4,0,"Plains")]
+  dt[statefip==73, c("bea.region","region.flag","bea.region.name"):=list(4,0,"Plains")]
+  dt[statefip==74, c("bea.region","region.flag","bea.region.name"):=list(2,0,"Mideast")]
+  dt[statefip==75, c("bea.region","region.flag","bea.region.name"):=list(5,0,"Southeast")]
+  dt[statefip==76, c("bea.region","region.flag","bea.region.name"):=list(5,0,"Southeast")]
+  dt[statefip==77, c("bea.region","region.flag","bea.region.name"):=list(100,0,NA)]
+  dt[statefip==78, c("bea.region","region.flag","bea.region.name"):=list(100,0,NA)]
+  dt[statefip==79, c("bea.region","region.flag","bea.region.name"):=list(100,0,NA)]
+  dt[statefip==80, c("bea.region","region.flag","bea.region.name"):=list(100,0,NA)]
+  dt[statefip==81, c("bea.region","region.flag","bea.region.name"):=list(100,0,NA)]
+  dt[statefip==83, c("bea.region","region.flag","bea.region.name"):=list(100,0,NA)]
+  dt[statefip==84, c("bea.region","region.flag","bea.region.name"):=list(100,0,NA)]
+  dt[statefip==85, c("bea.region","region.flag","bea.region.name"):=list(100,0,NA)]
+  dt[statefip==87, c("bea.region","region.flag","bea.region.name"):=list(100,0,NA)]
+  dt[statefip==88, c("bea.region","region.flag","bea.region.name"):=list(100,0,NA)]
+  dt[statefip==89, c("bea.region","region.flag","bea.region.name"):=list(100,0,NA)]
+  dt[statefip==90, c("bea.region","region.flag","bea.region.name"):=list(100,0,NA)]
 }
 
 ##########################################################################################################

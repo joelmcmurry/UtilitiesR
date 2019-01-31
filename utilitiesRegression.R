@@ -132,6 +132,16 @@ reg.2SLS <- function(dt, outcome.var, treatment.var, instrument.var, regressors,
   return(model.tot)
 }
 
+#= Convenience =#
+
+# estimate list of models with single outcome
+estimate.models.single.outcome <- function(outcome.var, regressor.list, dt, fixed.effects, cluster.group){
+  
+  model.list <- lapply(regressor.list, reg.OLS, dt=dt, 
+                       outcome.var=outcome.var, fixed.effects=fixed.effects, cluster.group=cluster.group)
+  
+}
+
 ######################################################################################################
 ## Regression Output
 
@@ -279,6 +289,18 @@ gen.mult.var.val.combo <- function(dt, regressors.discrete){
   out.list.noNA <- out.list[grep("NA", out.list, invert=TRUE)]
   
   return(out.list.noNA)
+}
+
+#= Convenience =#
+
+# function that outputs all models for given outcome
+output.all.models.single.outcome <- function(model.list.outcome.name, auto.label.covariate.object, title.prefix="model", 
+                                             omit.list=NULL, picDir=NULL, fe.lines=NULL, single.row=FALSE, font.size="tiny"){
+  
+  print.reg.out.auto.label(model.list.outcome.name[[1]], auto.label.covariate.object, title=model.list.outcome.name[[2]],
+                           omit.list=omit.list, file.name=paste0(title.prefix,model.list.outcome.name[[3]],".tex"), file.path=picDir, 
+                           add.lines=fe.lines, font.size=font.size, single.row=single.row)
+  
 }
 
 ######################################################################################################

@@ -67,15 +67,28 @@ strip.redundant.date <- function(dt, year.start=1986, year.end=2018){
 }
 
 # consistent re-naming of variables meant to be same
-common.var.name <- function(dt, var.list.to.change, new.var.name){
+common.var.name <- function(dt, var.list.to.change, new.var.name, restrict.to.year.form=1){
   
   # extract column names to collapse to common naming convention
   colnames.to.change <- colnames(dt)[grep(paste0(var.list.to.change,"_",collapse="|"), colnames(dt))]
   
+  # if prompted, keep only var_yXXX form
+  if (restrict.to.year.form==1){
+    # extract list of years in survey
+    year.list <- unique(unlist(lapply(colnames(dt), function(x) substr(x, nchar(x)-3, nchar(x)))))
+    
+    # keep only variables of form "varname_YEAR"
+    colnames.to.change.year <- do.call(paste0, expand.grid(paste0(var.list.to.change,"_"),year.list))
+    
+    # identify variables to keep with year appended 
+    colnames.to.change <- intersect(colnames.to.change.year, colnames(dt)) 
+    # colnames.to.change <- colnames(dt)[grep(paste0("^",colnames.to.change.year, collapse="|"), colnames(dt), perl=TRUE)]    
+  }
+
   # create new names
   colnames.new <- gsub(paste0(var.list.to.change, collapse="|"), new.var.name, colnames.to.change)
   
-  # switch names
+  # switch names 
   setnames(dt, old=colnames.to.change, new=colnames.new)
   
 }
@@ -84,6 +97,53 @@ common.var.name <- function(dt, var.list.to.change, new.var.name){
 common.var.name.list <- function(dt, list.with.vars.and.name){
   common.var.name(dt, list.with.vars.and.name[[1]], list.with.vars.and.name[[2]])
 }
+
+# rename suffix, general
+rename.suffix <- function(dt, var.name, old.suffix, new.suffix){
+  
+  # extract column names to collapse to common naming convention
+  colnames.to.change <- get.cols(var.name, dt)
+  
+  # create new names
+  colnames.new <- gsub(paste0(old.suffix, collapse="|"), new.suffix, colnames.to.change)
+  
+  # switch names
+  setnames(dt, old=colnames.to.change, new=colnames.new)
+  
+}
+
+# above, packaged as list
+rename.suffix.list <- function(dt, list.for.change){
+  rename.suffix(dt, list.for.change[[1]], list.for.change[[2]], list.for.change[[3]])
+}
+
+# replace characters
+replace.char <- function(dt, var.name, old.char, new.char){
+  
+  # extract column names to collapse to common naming convention
+  colnames.to.change <- get.cols(var.name, dt)
+  
+  # create new names
+  colnames.new <- gsub(paste0(old.char, collapse="|"), new.char, colnames.to.change)
+  
+  # switch names
+  setnames(dt, old=colnames.to.change, new=colnames.new)
+  
+}
+
+# lag variable years of form var_yXXX (example: income reported last year)
+# lag.nlsy.var <- function(dt, var.name){
+#   
+#   # extract column names to collapse to common naming convention
+#   colnames.to.change <- get.cols(paste0(var.name,"_"), dt)
+#   
+#   # create new names
+#   colnames.new <- gsub(paste0(var.list.to.change, collapse="|"), new.var.name, colnames.to.change)
+#   
+#   # switch names
+#   setnames(dt, old=colnames.to.change, new=colnames.new)
+#   
+# }
 
 ##########################################################################################################
 ## Subset and Reshape

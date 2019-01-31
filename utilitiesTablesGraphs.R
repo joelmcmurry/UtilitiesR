@@ -52,7 +52,7 @@ assign.var.label <- function(tab, var.label.lookup){
 }
 
 # print stargazer table
-print.tab <- function(tab, cols.to.keep, col.labels, title, font.size="small", width="5pt", align=NULL){
+print.tab <- function(tab, cols.to.keep, col.labels, title, font.size="small", width="5pt", align=NULL, picDir=NULL, outFile="noPrint"){
   
   tab.out <- capture.output(stargazer(tab[,cols.to.keep, with=FALSE], summary=FALSE, title=title,
                                       covariate.labels  = col.labels, rownames=FALSE, font.size=font.size, 
@@ -63,7 +63,12 @@ print.tab <- function(tab, cols.to.keep, col.labels, title, font.size="small", w
     tab.out[grepl(paste0(rep("c",length(cols.to.keep)), collapse=""), tab.out)] <- gsub(paste0(rep("c",length(cols.to.keep)), collapse=""), align, 
                                                                                         tab.out[grepl(paste0(rep("c",length(cols.to.keep)), collapse=""), tab.out)])
   }
-  cat(tab.out)
+  
+  if (outFile=="noPrint"){
+    cat(tab.out)
+  } else {
+   cat(tab.out, file=paste0(picDir,"/",outFile,".tex"))
+  }
 }
 
 # print xtable

@@ -177,3 +177,21 @@ flag.quantile <- function(dt, var.name, class.vars, by.vars=NULL, quantile.n=2, 
   
   return(dt.out)
 }
+
+# accumulated changes across years
+accum.change <- function(dt, series.name, by.vars, year.var.name="year.var"){
+  
+  setkeyv(dt, c(by.vars, year.var.name))
+  
+  dt[, temp.series:=dt[, series.name, with=FALSE]]
+  dt[, temp.year:=dt[, year.var.name, with=FALSE]]
+  
+  dt.accum.change <- dt[!is.na(temp.series) & temp.series!=0, .(year=temp.year, cum.series=log(temp.series/.SD[1,temp.series])), by=by.vars]
+  dt.accum.change[, paste0(series.name,".cum.change"):=cum.series]
+  
+  dt.accum.change[, cum.series:=NULL]
+  dt[, temp.series:=NULL]
+  dt[, temp.year:=NULL]
+  
+  return(dt.accum.change)
+}
