@@ -81,7 +81,7 @@ log.var <- function(dt, var.name){
 }
 
 # convert nominal to real values
-convert.real <- function(dt, var.name, dt.defl, defl.var.name, base.year=2016, replace.nom=1, year.name=0){
+convert.real <- function(dt, var.name, dt.defl, defl.var.name, base.year=2016, replace.nom=1, year.name=0, lag.switch=1){
   setkey(dt, year)
   setkey(dt.defl, year)
   
@@ -102,6 +102,28 @@ convert.real <- function(dt, var.name, dt.defl, defl.var.name, base.year=2016, r
     dt[, (var.name):=NULL]  
   }
   
+  # if prompted, rename leads/lags so that lag is last word in title
+  if (lag.switch==1 & (regexpr("lead", var.name)[[1]]>0|regexpr("lag", var.name)[[1]]>0)){
+    
+    if (regexpr("lead", var.name)[[1]]>0){
+      # extract number of leads
+      num.leads <- substr(var.name, regexpr("lead", var.name)[[1]]+4,regexpr("lead", var.name)[[1]]+5)
+      
+      # switch name
+      var.name.switch <- gsub(paste0("lead",num.leads,"."),"real.", gsub(".real",paste0(".lead",num.leads), paste0(var.name,".real")))
+    }
+    
+    if (regexpr("lag", var.name)[[1]]>0){
+      # extract number of lags
+      num.lags <- substr(var.name, regexpr("lag", var.name)[[1]]+3,regexpr("lag", var.name)[[1]]+4)
+      
+      # switch name
+      var.name.switch <- gsub(paste0("lag",num.lags,"."),"real.", gsub(".real",paste0(".lag",num.lags), paste0(var.name,".real")))
+    }
+    
+    setnames(dt, old=paste0(var.name,".real"), new=var.name.switch)
+  }
+    
   return(dt)
 }
 

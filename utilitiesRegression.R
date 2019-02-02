@@ -163,7 +163,7 @@ print.reg.out <- function(model, se=NULL, title="", outcome.labels=NULL, cov.lab
             omit=omit.list,
             add.lines = add.lines,
             keep.stat=c("n","rsq"), 
-            column.sep.width="0pt", font.size="small", out=out.file, single.row=single.row, order=order)
+            column.sep.width="0pt", font.size=font.size, out=out.file, single.row=single.row, order=order)
   
 }
 

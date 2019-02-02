@@ -131,19 +131,74 @@ replace.char <- function(dt, var.name, old.char, new.char){
   
 }
 
-# lag variable years of form var_yXXX (example: income reported last year)
-# lag.nlsy.var <- function(dt, var.name){
-#   
-#   # extract column names to collapse to common naming convention
-#   colnames.to.change <- get.cols(paste0(var.name,"_"), dt)
-#   
-#   # create new names
-#   colnames.new <- gsub(paste0(var.list.to.change, collapse="|"), new.var.name, colnames.to.change)
-#   
-#   # switch names
-#   setnames(dt, old=colnames.to.change, new=colnames.new)
-#   
-# }
+# pad dataset with all years
+pad.nlsy.years <- function(dt, by.vars){
+  
+  years.in.data <- unique(dt$year)
+  
+  min.year.in.data <- min(years.in.data)
+  max.year.in.data <- max(years.in.data)
+  
+  missing.years <- setdiff(seq(min.year.in.data,max.year.in.data), years.in.data)
+  
+  # pad with missing years for each by var
+  dt.pad <- copy(unique(dt[, c(by.vars), with=FALSE]))
+  dt.pad[, year:=missing.years[[1]]]
+  
+  for (miss.year in missing.years[2:length(missing.years)]){
+    dt.new.year <- copy(unique(dt[, c(by.vars), with=FALSE]))
+    dt.new.year[, year:=miss.year]
+    
+    dt.pad <- rbind(dt.pad, dt.new.year)
+  }
+  
+  dt.out <- rbind(dt, dt.pad, fill=TRUE)
+  
+  setkeyv(dt.out, c(by.vars,"year"))
+}
+
+# lag years for certain variables
+lag.years.nlsy <- function(dt, var.list, by.vars){
+  
+  # check that dataset is padded for all years
+  if (length(setdiff(seq(min(dt$year),max(dt$year)),unique(dt$year)))>0){
+    stop("NEED TO PAD YEARS")
+  }
+  
+  # lead selected variables
+  lapply(var.list, lag.var, dt=dt, type="lead", n=1, by.vars=by.vars)
+  
+  # replace non-lead with lead and delete lead
+  for (var in var.list){
+    dt[, lead.var:=dt[, paste0(var,".lead.1"),with=FALSE]]
+    
+    dt[, (var):=lead.var]
+    dt[, (paste0(var,".lead.1")):=NULL]
+  }
+  
+}
+
+# interpolate non-survey years
+interp.non.survey.nlsy <- function(dt, var, years.to.interp=seq(1994,2014,2), by.vars){
+  
+  setkeyv(dt, c(by.vars,"year"))
+  
+  dt[, temp_var:=dt[, var, with=FALSE]]
+  
+  dt[, temp_var:=as.numeric(temp_var)]
+  
+  dt[, temp_var_lag:=shift(temp_var, type="lag"), by=by.vars]
+  dt[, temp_var_lead:=shift(temp_var, type="lead"), by=by.vars]
+  
+  dt[year %in% years.to.interp & is.na(temp_var), temp_var:=(temp_var_lag+temp_var_lead)/2]
+  
+  dt[, paste0(var):=temp_var]
+  
+  dt[, temp_var:=NULL]
+  dt[, temp_var_lag:=NULL]
+  dt[, temp_var_lead:=NULL]
+  
+}
 
 ##########################################################################################################
 ## Subset and Reshape
