@@ -103,25 +103,25 @@ convert.real <- function(dt, var.name, dt.defl, defl.var.name, base.year=2016, r
   }
   
   # if prompted, rename leads/lags so that lag is last word in title
-  if (lag.switch==1 & (regexpr("lead", var.name)[[1]]>0|regexpr("lag", var.name)[[1]]>0)){
-    
-    if (regexpr("lead", var.name)[[1]]>0){
+  if (lag.switch==1 & (regexpr("\\blead\\b", var.name)[[1]]>0|regexpr("\\blag\\b", var.name)[[1]]>0)){
+
+    if (regexpr("\\blead\\b", var.name)[[1]]>0){
       # extract number of leads
-      num.leads <- substr(var.name, regexpr("lead", var.name)[[1]]+4,regexpr("lead", var.name)[[1]]+5)
-      
+      num.leads <- substr(var.name, regexpr("\\blead\\b", var.name)[[1]]+4,regexpr("\\blead\\b", var.name)[[1]]+5)
+
       # switch name
-      var.name.switch <- gsub(paste0("lead",num.leads,"."),"real.", gsub(".real",paste0(".lead",num.leads), paste0(var.name,".real")))
+      var.name.switch <- gsub(paste0("\\b.lead",num.leads,".\\b"),".real.", gsub(".real",paste0(".lead",num.leads), paste0(var.name,".real")))
     }
-    
-    if (regexpr("lag", var.name)[[1]]>0){
+
+    if (regexpr("\\blag\\b", var.name)[[1]]>0){
       # extract number of lags
-      num.lags <- substr(var.name, regexpr("lag", var.name)[[1]]+3,regexpr("lag", var.name)[[1]]+4)
-      
+      num.lags <- substr(var.name, regexpr("\\blag\\b", var.name)[[1]]+3,regexpr("\\blag\\b", var.name)[[1]]+4)
+
       # switch name
-      var.name.switch <- gsub(paste0("lag",num.lags,"."),"real.", gsub(".real",paste0(".lag",num.lags), paste0(var.name,".real")))
+      var.name.switch <- gsub(paste0("\\b.lag",num.lags,".\\b"),".real.", gsub(".real",paste0(".lag",num.lags), paste0(var.name,".real")))
     }
-    
-    setnames(dt, old=paste0(var.name,".real"), new=var.name.switch)
+
+   setnames(dt, old=paste0(var.name,".real"), new=var.name.switch)
   }
     
   return(dt)
@@ -171,15 +171,18 @@ run.var <- function(dt, var.name, by.vars, time.vars, start.var=NULL){
 }
 
 # flag quantile of variable by group and tag whether above/below median
-flag.quantile <- function(dt, var.name, class.vars, by.vars=NULL, quantile.n=2, tag.median=TRUE){
+flag.quantile <- function(dt, var.name, class.vars, by.vars=NULL, quantile.n=2, tag.median=TRUE, var.suffix=NULL){
   
   # retain at (class vars, by vars) level
   dt.for.analysis <- unique(dt[, c(class.vars, by.vars, var.name), with=FALSE])
 
   # flag quantiles
   dt.for.analysis[, temp_var_to_flag:=dt.for.analysis[, var.name, with=FALSE]]
+  
+  # count number of observations by group
+  dt.for.analysis[!is.na(temp_var_to_flag), n_obs_by_group:=.N, by=by.vars]
 
-  dt.for.analysis[!is.na(temp_var_to_flag), temp_quantile:=cut(temp_var_to_flag, 
+  dt.for.analysis[!is.na(temp_var_to_flag) & n_obs_by_group>quantile.n, temp_quantile:=cut(temp_var_to_flag, 
                                        unique(quantile(temp_var_to_flag, probs=seq(0,1,1/quantile.n), na.rm=TRUE)),
                                                  include.lowest=TRUE, labels=FALSE), by=by.vars]
 
@@ -188,10 +191,10 @@ flag.quantile <- function(dt, var.name, class.vars, by.vars=NULL, quantile.n=2, 
   
   # merge into main dataset
   dt.out <- merge(dt, dt.for.analysis[,c(class.vars,by.vars,"temp_var_to_flag","temp_quantile"), with=FALSE], by=c(class.vars, by.vars))
-  dt.out[, (paste0(var.name,".quantile")):=as.factor(temp_quantile)]
+  dt.out[, (paste0(var.name,".quantile",var.suffix)):=as.factor(temp_quantile)]
   
   if (tag.median){
-   dt.out[, (paste0(var.name,".above.med")):=as.numeric(temp_quantile>(quantile.n/2))]
+   dt.out[, (paste0(var.name,".above.med",var.suffix)):=as.numeric(temp_quantile>(quantile.n/2))]
   }
 
   dt.out[, temp_var_to_flag:=NULL]

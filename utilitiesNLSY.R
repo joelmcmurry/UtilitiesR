@@ -174,6 +174,7 @@ lag.years.nlsy <- function(dt, var.list, by.vars){
     
     dt[, (var):=lead.var]
     dt[, (paste0(var,".lead.1")):=NULL]
+    dt[, lead.var:=NULL]
   }
   
 }
