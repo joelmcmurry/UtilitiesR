@@ -135,11 +135,30 @@ reg.2SLS <- function(dt, outcome.var, treatment.var, instrument.var, regressors,
 #= Convenience =#
 
 # estimate list of models with single outcome
-estimate.models.single.outcome <- function(outcome.var, regressor.list, dt, fixed.effects, cluster.group){
+estimate.models.single.outcome <- function(outcome.var, regressor.list, dt, fixed.effects, cluster.group, inter.list.1=c(), inter.list.2=c()){
   
-  model.list <- lapply(regressor.list, reg.OLS, dt=dt, 
-                       outcome.var=outcome.var, fixed.effects=fixed.effects, cluster.group=cluster.group)
+  # no interactions
+  if (length(inter.list.1)==0){
+    model.list <- lapply(regressor.list, reg.OLS, dt=dt, 
+                         outcome.var=outcome.var, fixed.effects=fixed.effects, cluster.group=cluster.group)
+  } else {
+    
+    # build list of model spec
+    model.spec.list <- build.model.specs(outcome.var, regressor.list, fixed.effects, inter.list.1, inter.list.2, cluster.group)
   
+    model.list <- lapply(model.spec.list, reg.OLS.for.list, dt=dt)
+  }
+  
+}
+
+# build model specs for use with functions that take lists as arguments
+build.model.specs <- function(outcome.var, regressor.list, fixed.effects, inter.list.1, inter.list.2, cluster){
+  model.spec.list <- list()
+  for (i in 1:length(regressor.list)){
+    model.spec.list[[i]] <- list(outcome.var, regressor.list[[i]], fixed.effects, 
+                                 inter.list.1[[i]], inter.list.2[[i]], cluster)
+  }
+  return(model.spec.list)
 }
 
 ######################################################################################################
@@ -147,7 +166,7 @@ estimate.models.single.outcome <- function(outcome.var, regressor.list, dt, fixe
 
 # stargazer regression table
 print.reg.out <- function(model, se=NULL, title="", outcome.labels=NULL, cov.labels=NULL, omit.list=c(), add.lines=c(), 
-                          file.name="outFile.tex", file.path="noprint", font.size="small", single.row=FALSE, order=NULL){
+                          file.name="outFile.tex", file.path="noprint", font.size="small", single.row=FALSE, order=NULL, no.space=FALSE){
   
   # define path
   if (file.path=="noprint"){
@@ -163,13 +182,14 @@ print.reg.out <- function(model, se=NULL, title="", outcome.labels=NULL, cov.lab
             omit=omit.list,
             add.lines = add.lines,
             keep.stat=c("n","rsq"), 
-            column.sep.width="0pt", font.size=font.size, out=out.file, single.row=single.row, order=order)
+            column.sep.width="0pt", font.size=font.size, out=out.file, single.row=single.row, order=order, no.space=no.space)
   
 }
 
 # stargazer regression table that dynamically selects covariate labels
 print.reg.out.auto.label <- function(model, auto.label.list, se=NULL, title="", outcome.labels=NULL, omit.list=c(), add.lines=c(), 
-                                     file.name="outFile.tex", file.path="noprint", font.size="small", single.row=FALSE, no.label=0, order=NULL){
+                                     file.name="outFile.tex", file.path="noprint", font.size="small", single.row=FALSE, no.label=0, order=NULL, 
+                                     no.space=FALSE){
   
   # unpack objects from passed auto.label.list
   dt <- auto.label.list[[1]]
@@ -196,7 +216,7 @@ print.reg.out.auto.label <- function(model, auto.label.list, se=NULL, title="", 
   
   # print table
   print.reg.out(model, se=se, title=title, outcome.labels=outcome.labels, cov.labels=cov.labels, omit.list=omit.list, add.lines=add.lines, 
-                file.name=file.name, file.path=file.path, font.size=font.size, single.row=single.row, 
+                file.name=file.name, file.path=file.path, font.size=font.size, single.row=single.row, no.space=no.space,
                 order=paste0("^\\b",list.to.keep,"$\\b"))
   
 }
@@ -294,12 +314,12 @@ gen.mult.var.val.combo <- function(dt, regressors.discrete){
 #= Convenience =#
 
 # function that outputs all models for given outcome
-output.all.models.single.outcome <- function(model.list.outcome.name, auto.label.covariate.object, title.prefix="model", 
-                                             omit.list=NULL, picDir=NULL, fe.lines=NULL, single.row=FALSE, font.size="tiny"){
+output.all.models.single.outcome <- function(model.list.outcome.name, auto.label.covariate.object, title.prefix="model", outcome.labels=NULL,
+                                             omit.list=NULL, picDir=NULL, fe.lines=NULL, single.row=FALSE, font.size="tiny", no.space=FALSE, no.label=0){
   
-  print.reg.out.auto.label(model.list.outcome.name[[1]], auto.label.covariate.object, title=model.list.outcome.name[[2]],
+  print.reg.out.auto.label(model.list.outcome.name[[1]], auto.label.covariate.object, title=model.list.outcome.name[[2]], outcome.labels=outcome.labels,
                            omit.list=omit.list, file.name=paste0(title.prefix,model.list.outcome.name[[3]],".tex"), file.path=picDir, 
-                           add.lines=fe.lines, font.size=font.size, single.row=single.row)
+                           add.lines=fe.lines, font.size=font.size, single.row=single.row, no.space=no.space, no.label=no.label)
   
 }
 

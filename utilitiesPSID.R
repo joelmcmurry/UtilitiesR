@@ -201,7 +201,11 @@ psid.family.link.two.gen <- function(dt.respondent, dt.fims, dt.head.wife,
   indiv.var.cols <- get.cols(paste0(indiv.vars.to.link,collapse="|"),dt.linked.w)
   other.cols <- setdiff(colnames(dt.linked.w), c(hh.var.cols, indiv.var.cols))
   
-  setcolorder(dt.linked.w, c(other.cols, hh.var.cols, indiv.var.cols))
+  # if (!is.null(indiv.vars.to.link)){
+  #   setcolorder(dt.linked.w, c(other.cols, hh.var.cols, indiv.var.cols))
+  # } else {
+  #   setcolorder(dt.linked.w, c(other.cols, hh.var.cols))
+  # }
   
   return(dt.linked.w)
 }
