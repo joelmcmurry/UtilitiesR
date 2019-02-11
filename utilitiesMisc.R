@@ -220,3 +220,14 @@ accum.change <- function(dt, series.name, by.vars, year.var.name="year.var"){
   
   return(dt.accum.change)
 }
+
+# replicate Stata's "maxmode" function that finds mode of a variable and breaks ties with maximum
+max.mode <- function(x){
+  ux <- sort(na.omit(x), decreasing=TRUE)
+  ux[which.max(tabulate(match(x,ux)))]
+}
+
+# max returning NA instead of -Inf if all values are NA
+max2 <- function(x){
+  ifelse(!all(is.na(x)), max(x, na.rm=TRUE), NA)
+}

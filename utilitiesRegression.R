@@ -15,116 +15,49 @@ library(haven)
 source("utilitiesMisc.R")
 
 ######################################################################################################
-## Regressions
-
-#= OLS =#
+## Regressions - Streamlined
 
 # OLS
-reg.OLS <- function(dt, outcome.var, regressors, fixed.effects="0", inter.list.1=c(), inter.list.2=c(), cluster.group=c()){
+reg.OLS <- function(dt, outcome.var, regressors, fixed.effects="0", cluster.group=c()){
   
-  # create interactions between lists 1 and 2
-  if ((length(inter.list.1)>0) & (length(inter.list.2)>0)){
-    interactions <- paste(rep(inter.list.1, each = length(inter.list.2)), inter.list.2, sep = ":")
-  } else {
-    interactions <- c()
+  # remove regressors if 0 non-NA and throw warning
+  regressors.valid <- regressors[unlist(lapply(regressors[!grepl(":",regressors)], var.nonmissing, dt=dt, non.missing.rows=1))]
+  if (length(regressors.valid)!=length(regressors)){
+    warning("SOME REGRESSORS HAVE 0 NON-NA AND HAVE BEEN REMOVED")
   }
-  
+
   if (length(cluster.group)>0){
-    model <- felm(as.formula(paste(outcome.var,"~",paste(c(regressors, interactions), collapse="+")," | ", paste(fixed.effects, collapse="+"), 
+    model <- felm(as.formula(paste(outcome.var,"~",paste(regressors.valid, collapse="+")," | ", paste(fixed.effects, collapse="+"),
                                    "| 0 |", paste(cluster.group, collapse="+"))), data = dt)
   } else {
-    model <- felm(as.formula(paste(outcome.var,"~",paste(c(regressors, interactions), collapse="+")," | ", paste(fixed.effects, collapse="+"))), data = dt)
+    model <- felm(as.formula(paste(outcome.var,"~",paste(regressors.valid, collapse="+")," | ", paste(fixed.effects, collapse="+"))), data = dt)
   }
-  
+
   return(model)
+
 }
 
-# OLS regression that takes single list object with 
-reg.OLS.for.list <- function(dt, model.spec){
-  
-  # unpack model spec
-  outcome.var <- model.spec[[1]]
-  regressors <- model.spec[[2]]
-  fixed.effects <- model.spec[[3]]
-  inter.list.1 <- model.spec[[4]]
-  inter.list.2 <- model.spec[[5]]
-  cluster.group <- model.spec[[6]]
-  
-  model.out <- reg.OLS(dt, outcome.var, regressors, fixed.effects, inter.list.1=inter.list.1, inter.list.2=inter.list.2, cluster.group=cluster.group)
-  
-  return(model.out)
+# OLS taking model spec object
+reg.OLS.model.spec <- function(dt, model.spec){
+  reg.OLS(dt, model.spec[[1]], model.spec[[2]], model.spec[[3]], model.spec[[4]])
 }
 
-# OLS conditioning on value of single variable (modifies regressor list)
-reg.OLS.fix.var <- function(var.fix, fix.val, dt, outcome.var, regressors, fixed.effects="0", inter.list.1=c(), inter.list.2=c(), 
-                            cluster.group=c(), non.missing.rows=1){
+# IV
+reg.IV <- function(dt, outcome.var, regressors, endog.vars, instrument.vars, fixed.effects="0", cluster.group=c()){
   
-  # create temporary variable to fix
-  dt[, temp.var.fix:=dt[, var.fix, with=FALSE]]
-  
-  # remove regressors and interactions without any observations
-  regressors.valid <- regressors[unlist(lapply(regressors, var.nonmissing, dt=dt[temp.var.fix==fix.val], non.missing.rows=non.missing.rows))]
-  
-  if (length(inter.list.1) > 0){
-    inter.list.1.valid <- inter.list.1[unlist(lapply(inter.list.1, var.nonmissing, dt=dt[temp.var.fix==fix.val]))]
-  } else {
-    inter.list.1.valid <- c()
+  # remove regressors if 0 non-NA and throw warning
+  regressors.valid <- regressors[unlist(lapply(regressors[!grepl(":",regressors)], var.nonmissing, dt=dt, non.missing.rows=1))]
+  if (length(regressors.valid)!=length(regressors)){
+    warning("SOME REGRESSORS HAVE 0 NON-NA AND HAVE BEEN REMOVED")
   }
-  
-  if (length(inter.list.2) > 0){
-    inter.list.2.valid <- inter.list.2[unlist(lapply(inter.list.2, var.nonmissing, dt=dt[temp.var.fix==fix.val]))]
-  } else {
-    inter.list.2.valid <- c()
-  }
-  
-  model.out <- reg.OLS(dt[temp.var.fix==fix.val], outcome.var, regressors.valid, fixed.effects=fixed.effects, 
-                         inter.list.1=inter.list.1.valid, inter.list.2=inter.list.2.valid, cluster.group=cluster.group)
-  
-  # remove temporary variable to fix
-  dt[, temp.var.fix:=NULL]
-  
-  return(model.out)
-}
-
-#= IV =#
-
-# 2SLS
-reg.2SLS <- function(dt, outcome.var, treatment.var, instrument.var, regressors, fixed.effects, 
-                     interact.with.treatment=c(), inter.list.1=c(), inter.list.2=c(), cluster.group=c(), inter.flag=0){
-  
-  if (inter.flag==0){
-    inter.symbol <- ":"
-  }
-  else {
-    inter.symbol <- "."
-  }
-  
-  # create interactions between lists 1 and 2
-  if ((length(inter.list.1)>0) & (length(inter.list.2)>0)){
-    interactions <- paste(rep(inter.list.1, each = length(inter.list.2)), inter.list.2, sep = inter.symbol)
-  } else {
-    interactions <- c()
-  }
-  
-  # create interactions with treatment variable and instrument
-  if ((length(interact.with.treatment)>0)) {
-    treatment.interactions <- paste0(treatment.var, inter.symbol, interact.with.treatment)
-    instrument.interactions <- paste0(instrument.var, inter.symbol, interact.with.treatment)
-  } else {
-    treatment.interactions <- c()
-    instrument.interactions <- c()
-  }
-  
-  endog.vars <- c(treatment.var, treatment.interactions)
-  instrument.vars <- c(instrument.var, instrument.interactions)
   
   if (length(cluster.group)>0){
-    model.tot <- felm(as.formula(paste(outcome.var,"~",paste(c(regressors, interactions), collapse="+"),
+    model.tot <- felm(as.formula(paste(outcome.var,"~",paste(regressors.valid, collapse="+"),
                                        " | ", paste(fixed.effects, collapse="+"), "|",
                                        "(", paste(endog.vars, collapse="|"), "~", paste(instrument.vars, collapse="+"), ")", 
                                        "|", paste(cluster.group, collapse="+"))), data = dt)
   } else {
-    model.tot <- felm(as.formula(paste(outcome.var,"~",paste(c(regressors, interactions), collapse="+"),
+    model.tot <- felm(as.formula(paste(outcome.var,"~",paste(regressors.valid, collapse="+"),
                                        " | ", paste(fixed.effects, collapse="+"), "|",
                                        "(", paste(endog.vars, collapse="|"), "~", paste(instrument.vars, collapse="+"), ")")), data = dt)
   }
@@ -132,33 +65,135 @@ reg.2SLS <- function(dt, outcome.var, treatment.var, instrument.var, regressors,
   return(model.tot)
 }
 
-#= Convenience =#
-
-# estimate list of models with single outcome
-estimate.models.single.outcome <- function(outcome.var, regressor.list, dt, fixed.effects, cluster.group, inter.list.1=c(), inter.list.2=c()){
-  
-  # no interactions
-  if (length(inter.list.1)==0){
-    model.list <- lapply(regressor.list, reg.OLS, dt=dt, 
-                         outcome.var=outcome.var, fixed.effects=fixed.effects, cluster.group=cluster.group)
-  } else {
-    
-    # build list of model spec
-    model.spec.list <- build.model.specs(outcome.var, regressor.list, fixed.effects, inter.list.1, inter.list.2, cluster.group)
-  
-    model.list <- lapply(model.spec.list, reg.OLS.for.list, dt=dt)
-  }
-  
+# IV taking model spec object
+reg.IV.model.spec <- function(dt, model.spec){
+  reg.IV(dt, model.spec[[1]], model.spec[[2]], model.spec[[3]], model.spec[[4]], model.spec[[5]],  model.spec[[6]])
 }
 
-# build model specs for use with functions that take lists as arguments
-build.model.specs <- function(outcome.var, regressor.list, fixed.effects, inter.list.1, inter.list.2, cluster){
-  model.spec.list <- list()
-  for (i in 1:length(regressor.list)){
-    model.spec.list[[i]] <- list(outcome.var, regressor.list[[i]], fixed.effects, 
-                                 inter.list.1[[i]], inter.list.2[[i]], cluster)
+######################################################################################################
+## Auxiliary and Convenience
+
+# estimation function that detects whether to estimate with OLS or IV
+estimate.model.spec <- function(dt, model.spec){
+  
+  # OLS
+  if (length(model.spec)==4){
+    model.out <- reg.OLS.model.spec(dt, model.spec)
   }
+  
+  # IV
+  if (length(model.spec)==6){
+    model.out <- reg.IV.model.spec(dt, model.spec)
+  }
+  
+  return(model.out)
+}
+
+# estimate all models stored in a list of model spec objects
+estimate.model.spec.list <- function(dt.list, model.spec.list){
+  
+  if (length(dt.list)==1){
+    out.list <- lapply(model.spec.list, estimate.model.spec, dt=dt.list[[1]])
+  } else if (length(model.spec.list)==1) {
+    out.list <- lapply(dt.list, estimate.model.spec, model.spec=model.spec.list[[1]])
+  } else {
+    out.list <- mapply(estimate.model.spec, dt.list, model.spec.list)
+  }
+  return(out.list)
+}
+
+# build model specification object
+build.model.spec <- function(outcome.var.list, regressor.list, fixed.effects.list=c(), cluster.list=c(), 
+                             endog.var.list=c(), instrument.list=c()){
+  
+  model.spec.list <- list()
+  
+  n.models <- max(length(outcome.var.list),length(regressor.list),length(fixed.effects.list),length(instrument.list))
+  
+  # objects needed for any model
+  if (length(outcome.var.list)==1){
+    outcome.var.list <- rep(outcome.var.list, n.models)
+  }
+  
+  if (length(regressor.list)==1){
+    regressor.list <- rep(regressor.list, n.models)
+  }
+  
+  if (length(fixed.effects.list)==1){
+    fixed.effects.list <- rep(fixed.effects.list, n.models)
+  }
+  
+  if (length(cluster.list)==1){
+    cluster.list <- rep(cluster.list, n.models)
+  }
+  
+  # IV specific
+  if (length(instrument.list)!=0){
+    
+    if (length(instrument.list)==1){
+      instrument.list <- rep(instrument.list, n.models)
+    }
+    
+    if (length(endog.var.list)==1){
+      endog.var.list <- rep(endog.var.list, n.models)
+    }
+    
+    # package model spec for IV
+    for (i in 1:n.models){
+      model.spec.list[[i]] <- list(outcome.var.list[[i]], regressor.list[[i]], endog.var.list[[i]], instrument.list[[i]], 
+                                   fixed.effects.list[[i]], cluster.list[[i]])
+    }
+    
+  } else {
+    # package model spec for OLS
+    for (i in 1:n.models){
+      model.spec.list[[i]] <- list(outcome.var.list[[i]], regressor.list[[i]], fixed.effects.list[[i]], cluster.list[[i]])
+    }
+  }
+  
   return(model.spec.list)
+}
+
+# combine regressors and interactions
+combine.reg.inter <- function(regressors, inter.1, inter.2){
+  if (!is.null(inter.1)){
+    rhs.out <- c(regressors, paste0(inter.1,":",inter.2))
+  } else {
+    rhs.out <- regressors
+  }
+}
+
+# build list of model specifications with lag of outcome variable
+build.model.spec.lag.outcome <- function(dt, outcome.list, regressors, fixed.effects, inter.list.1=c(), inter.list.2=c(), cluster.group=c(),
+                                         lag.n=1, lag.by.vars){
+  
+  # lag outcome
+  for (i in 1:lag.n){
+    lapply(outcome.list, lag.var, dt=dt, type="lag", n=i, by.vars=lag.by.vars)
+  }
+  
+  model.spec.list <- list()
+  for (i in 1:length(outcome.list)){
+    
+    # add lags to regressors
+    regressors.i <- c(regressors, paste0(outcome.list[[i]], ".lag.", seq(1:lag.n)))
+    
+    model.spec.list[[i]] <- list(outcome.list[[i]], regressors.i, fixed.effects, inter.list.1, inter.list.2, cluster.group)
+  }
+  
+  return(model.spec.list)
+}
+
+# create interaction variables for use with LFE package
+create.inter <- function(dt, var.1, var.2){
+  
+  if (length(grep(paste0(var.1,".",var.2), colnames(dt)))==0){
+    dt[, temp_var.1:=dt[, var.1, with=FALSE]]
+    dt[, temp_var.2:=dt[, var.2, with=FALSE]]
+    
+    dt[, (paste0(var.1,".",var.2)):=temp_var.1*temp_var.2]
+  }
+  
 }
 
 ######################################################################################################
@@ -178,7 +213,7 @@ print.reg.out <- function(model, se=NULL, title="", outcome.labels=NULL, cov.lab
   }
   
   stargazer(model, se=se, type='latex', header=FALSE, title=title, 
-            dep.var.labels="", column.labels=outcome.labels, covariate.labels=cov.labels, 
+            dep.var.labels="", dep.var.labels.include=FALSE, column.labels=outcome.labels, covariate.labels=cov.labels, 
             omit=omit.list,
             add.lines = add.lines,
             keep.stat=c("n","rsq"), 
@@ -215,7 +250,8 @@ print.reg.out.auto.label <- function(model, auto.label.list, se=NULL, title="", 
   }
   
   # print table
-  print.reg.out(model, se=se, title=title, outcome.labels=outcome.labels, cov.labels=cov.labels, omit.list=omit.list, add.lines=add.lines, 
+  print.reg.out(model, se=se, title=title, outcome.labels=outcome.labels, cov.labels=cov.labels, 
+                omit.list=paste0("^",omit.list,"$"), add.lines=add.lines, 
                 file.name=file.name, file.path=file.path, font.size=font.size, single.row=single.row, no.space=no.space,
                 order=paste0("^\\b",list.to.keep,"$\\b"))
   
@@ -311,50 +347,39 @@ gen.mult.var.val.combo <- function(dt, regressors.discrete){
   return(out.list.noNA)
 }
 
-#= Convenience =#
+######################################################################################################
+## Regression Output - Convenience
 
-# function that outputs all models for given outcome
-output.all.models.single.outcome <- function(model.list.outcome.name, auto.label.covariate.object, title.prefix="model", outcome.labels=NULL,
+## Table Type 1: Multiple Models, Single Outcome
+
+output.all.models.single.outcome <- function(list.models.title.file, auto.label.covariate.object, title.prefix="model", outcome.labels=NULL,
                                              omit.list=NULL, picDir=NULL, fe.lines=NULL, single.row=FALSE, font.size="tiny", no.space=FALSE, no.label=0){
   
-  print.reg.out.auto.label(model.list.outcome.name[[1]], auto.label.covariate.object, title=model.list.outcome.name[[2]], outcome.labels=outcome.labels,
-                           omit.list=omit.list, file.name=paste0(title.prefix,model.list.outcome.name[[3]],".tex"), file.path=picDir, 
+  print.reg.out.auto.label(list.models.title.file[[1]], auto.label.covariate.object, title=list.models.title.file[[2]], outcome.labels=outcome.labels,
+                           omit.list=omit.list, file.name=paste0(title.prefix,list.models.title.file[[3]],".tex"), file.path=picDir, 
                            add.lines=fe.lines, font.size=font.size, single.row=single.row, no.space=no.space, no.label=no.label)
   
 }
 
-######################################################################################################
-## Auxiliary
-
-# build list of model specifications with lag of outcome variable
-build.model.spec.lag.outcome <- function(dt, outcome.list, regressors, fixed.effects, inter.list.1=c(), inter.list.2=c(), cluster.group=c(), 
-                                         lag.n=1, lag.by.vars){
-  
-  # lag outcome
-  for (i in 1:lag.n){
-    lapply(outcome.list, lag.var, dt=dt, type="lag", n=i, by.vars=lag.by.vars)
-  }
-  
-  model.spec.list <- list()
-  for (i in 1:length(outcome.list)){
-    
-    # add lags to regressors
-    regressors.i <- c(regressors, paste0(outcome.list[[i]], ".lag.", seq(1:lag.n)))
-    
-    model.spec.list[[i]] <- list(outcome.list[[i]], regressors.i, fixed.effects, inter.list.1, inter.list.2, cluster.group)
-  }
-  
-  return(model.spec.list) 
+# above outputting a tiny version too
+output.all.models.single.outcome.tiny.too <- function(list.models.title.file, auto.label.covariate.object, title.prefix="model", outcome.labels=NULL,
+                                                      omit.list=NULL, picDir=NULL, fe.lines=NULL, single.row=FALSE, font.size="small", no.space=FALSE, no.label=0){
+  # requested
+  output.all.models.single.outcome(list.models.title.file, auto.label.covariate.object, title.prefix=title.prefix, outcome.labels=outcome.labels,
+                                   omit.list=omit.list, picDir=picDir, fe.lines=fe.lines, single.row=single.row, font.size=font.size, no.space=no.space, no.label=no.label)
+  # tiny too
+  output.all.models.single.outcome(list.models.title.file, auto.label.covariate.object, title.prefix=paste0("tiny",title.prefix), outcome.labels=outcome.labels, 
+                                   omit.list=omit.list, picDir=picDir, fe.lines=fe.lines, single.row=single.row, font.size="tiny", no.space=no.space, no.label=no.label)
 }
 
-# create interaction variables for use with LFE package
-create.inter <- function(dt, var.1, var.2){
+## Table Type 2: Multiple Outcomes, Single Model
+
+output.all.outcomes.single.model <- function(list.models.outcomes.title.file.fe, auto.label.covariate.object, title.prefix="model",
+                                             omit.list=NULL, picDir=NULL, single.row=FALSE, font.size="tiny", no.space=FALSE, no.label=0){
   
-  if (length(grep(paste0(var.1,".",var.2), colnames(dt)))==0){
-    dt[, temp_var.1:=dt[, var.1, with=FALSE]]
-    dt[, temp_var.2:=dt[, var.2, with=FALSE]]
-    
-    dt[, (paste0(var.1,".",var.2)):=temp_var.1*temp_var.2]
-  }
-  
+  print.reg.out.auto.label(list.models.outcomes.title.file.fe[[1]], auto.label.covariate.object, 
+                           title=list.models.outcomes.title.file.fe[[2]], outcome.labels=list.models.outcomes.title.file.fe[[3]],
+                           omit.list=omit.list, file.name=paste0(title.prefix,list.models.outcomes.title.file.fe[[4]],".tex"), file.path=picDir,
+                           add.lines=list.models.outcomes.title.file.fe[[5]], font.size=font.size, single.row=single.row, no.space=no.space, no.label=no.label)
+
 }

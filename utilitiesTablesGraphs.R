@@ -31,6 +31,8 @@ print.object <- function(obj.to.print, picDir, fileTitle="PRINTOBJECT", width=5.
     png(file=paste0(picDir,"/",fileTitle,".png"))
     print(obj.to.print)
     dev.off()
+  } else if (type=="pngg"){
+    ggsave(paste0(fileTitle,".png"), plot = plot, dpi=100, path=picDir)
   }
 }
 
