@@ -148,62 +148,6 @@ flag.industry <- function(dt){
 
 ## Hourly Wage Generation
 
-hourly.wage <- function(dt, wage.var.name="wage", income.var.name="incwage", hours.var.name="hours.ly"){
-  dt[, temp_hours:=dt[, hours.var.name, with=FALSE]]
-  dt[, temp_income:=dt[, income.var.name, with=FALSE]]
-  
-  dt[(is.na(temp_income)==FALSE) & (is.na(temp_hours)==FALSE) & (temp_income>0) & (temp_hours>0), (wage.var.name):=temp_income/temp_hours]
-  
-  dt[, temp_hours:=NULL]
-  dt[, temp_income:=NULL]
-}
-
-## Topcode Imputation
-
-estimate.topcode.heathcote <- function(dt, income.var.name, wt.var.name){
-  
-  dt[, temp_income:=dt[, income.var.name, with=FALSE]]
-  dt[, temp_income_top:=dt[, paste0("top.",income.var.name), with=FALSE]]
-  dt[, temp_wt:=dt[, wt.var.name, with=FALSE]]
-  
-  # in each year, compute fraction of households with income greater than respondent
-  setkey(dt, year, temp_income, temp_wt)
-  
-  dt[!is.na(temp_income) & temp_income>0, wt.above:=cumsum(temp_wt), by=.(year)]
-  dt[!is.na(temp_income) & temp_income>0, wt.tot:=sum(temp_wt), by=.(year)]
-  
-  dt[, log.v:=log(1-wt.above/wt.tot)]
-  dt[is.infinite(log.v), log.v:=NA]
-  dt[, log.y:=log(temp_income)]
-  
-  dt[!is.na(temp_income) & temp_income>0, temp_p90:=quantile(temp_income, probs=0.9), by=.(year)]
-  
-  for (yr in unique(dt[!is.na(temp_income) & temp_income>0, year])){
-    
-    if (nrow(dt[year==yr & !is.na(temp_income) & temp_income>0]) > 5  & nrow(dt[year==yr & temp_income_top==1])>0){
-      
-      print(paste0("Estimating Topcoding for ",yr))
-      
-      reg.logv.logy <- lm(log.v ~ log.y, data=dt[year==yr & !is.na(temp_income) & temp_income>0 & temp_income>temp_p90])
-      beta <- coef(reg.logv.logy)["log.y"][[1]]
-      
-      factor.year <- beta/(1+beta) 
-      
-      dt[year==yr & !is.na(temp_income) & temp_income>0 & temp_income_top==1, temp_income:=min(max(factor.year,1),5)*temp_income]
-      
-      factor.year <- NULL
-    }
-    
-  }
-  
-  dt[, (paste0(income.var.name,".top.adjust")):=temp_income]
-  
-  dt[, temp_income:=NULL]
-  dt[, temp_income_top:=NULL]
-  dt[, wt.above:=NULL]
-  dt[, wt.tot:=NULL]
-  dt[, log.v:=NULL]
-  dt[, log.y:=NULL]
-  dt[, temp_p90:=NULL]
-  
+hourly.wage <- function(dt){
+  dt[(is.na(incwage)==FALSE) & (is.na(hours.ly)==FALSE) & (incwage>0) & (hours.ly>0), wage:=incwage/hours.ly]
 }

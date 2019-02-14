@@ -57,6 +57,45 @@ var.nonmissing <- function(dt, var.name, non.missing.rows=1){
   return(is.nonmiss)
 }
 
+# function that recodes missing values of a variable with 0 and adds flag for missing
+recode.flag.na <- function(dt, var.name){
+  
+  # check if flag is already there
+  if (length(get.cols(paste0(var.name,".missflag"),dt))==0){
+    
+    dt[, temp_var:=dt[, var.name, with=FALSE]]
+    
+    dt[, temp_missing:=as.numeric(is.na(temp_var))]
+    
+    if (is.factor(dt$temp_var)){
+      
+      dt[, temp_var:=as.character(temp_var)]
+      
+      dt[is.na(temp_var), temp_var:="0"]
+      
+      dt[, temp_var:=as.factor(temp_var)]
+      
+    } else if (is.numeric(dt$temp_var)){
+    
+      dt[is.na(temp_var), temp_var:=0]
+    
+    } else if (is.character(dt$temp_var)){
+    
+      dt[is.na(temp_var), temp_var:="0"]
+    
+    }
+    
+    dt[, (var.name):=temp_var]
+    dt[, (paste0(var.name,".missflag")):=temp_missing]
+    
+    dt[, temp_var:=NULL]
+    dt[, temp_missing:=NULL]
+  } else {
+    dt
+  }
+  
+}
+
 # lag variable
 lag.var <- function(dt, var.name, type="lag", n=1, by.vars){
   
@@ -191,7 +230,7 @@ flag.quantile <- function(dt, var.name, class.vars, by.vars=NULL, quantile.n=2, 
   
   # merge into main dataset
   dt.out <- merge(dt, dt.for.analysis[,c(class.vars,by.vars,"temp_var_to_flag","temp_quantile"), with=FALSE], by=c(class.vars, by.vars))
-  dt.out[, (paste0(var.name,".quantile",var.suffix)):=as.factor(temp_quantile)]
+  dt.out[, (paste0(var.name,".quantile",quantile.n,var.suffix)):=as.factor(temp_quantile)]
   
   if (tag.median){
    dt.out[, (paste0(var.name,".above.med",var.suffix)):=as.numeric(temp_quantile>(quantile.n/2))]

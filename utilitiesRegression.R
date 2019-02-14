@@ -18,14 +18,30 @@ source("utilitiesMisc.R")
 ## Regressions - Streamlined
 
 # OLS
-reg.OLS <- function(dt, outcome.var, regressors, fixed.effects="0", cluster.group=c()){
+reg.OLS <- function(dt, outcome.var, regressors, fixed.effects="0", cluster.group=c(), missing.include=0){
   
   # remove regressors if 0 non-NA and throw warning
   regressors.valid <- regressors[unlist(lapply(regressors[!grepl(":",regressors)], var.nonmissing, dt=dt, non.missing.rows=1))]
   if (length(regressors.valid)!=length(regressors)){
     warning("SOME REGRESSORS HAVE 0 NON-NA AND HAVE BEEN REMOVED")
   }
-
+  
+  ## Add missing variable Indicators to Regressors
+  
+  if (missing.include==1){
+    # identify missflag variables in regressors
+    missflag.vars <- paste0(regressors.valid[!grepl(":",regressors.valid)], ".missflag")
+    
+    # retain missflag variables if there are actually missing variables
+    dt[, temp_outcome:=dt[, outcome.var, with=FALSE]]
+    
+    miss.exist <- unlist(lapply(missflag.vars, function(x) length(unique(dt[!is.na(temp_outcome), x, with=FALSE][[1]]))==2))
+    
+    missflag.vars.valid <- missflag.vars[miss.exist]
+    
+    regressors.valid <- c(regressors.valid, missflag.vars.valid)
+  }
+  
   if (length(cluster.group)>0){
     model <- felm(as.formula(paste(outcome.var,"~",paste(regressors.valid, collapse="+")," | ", paste(fixed.effects, collapse="+"),
                                    "| 0 |", paste(cluster.group, collapse="+"))), data = dt)
@@ -39,16 +55,39 @@ reg.OLS <- function(dt, outcome.var, regressors, fixed.effects="0", cluster.grou
 
 # OLS taking model spec object
 reg.OLS.model.spec <- function(dt, model.spec){
-  reg.OLS(dt, model.spec[[1]], model.spec[[2]], model.spec[[3]], model.spec[[4]])
+  reg.OLS(dt, model.spec[[1]], model.spec[[2]], model.spec[[3]], model.spec[[4]], model.spec[[5]])
 }
 
 # IV
-reg.IV <- function(dt, outcome.var, regressors, endog.vars, instrument.vars, fixed.effects="0", cluster.group=c()){
+reg.IV <- function(dt, outcome.var, regressors, endog.vars, instrument.vars, fixed.effects="0", cluster.group=c(), missing.include=0){
   
   # remove regressors if 0 non-NA and throw warning
   regressors.valid <- regressors[unlist(lapply(regressors[!grepl(":",regressors)], var.nonmissing, dt=dt, non.missing.rows=1))]
   if (length(regressors.valid)!=length(regressors)){
     warning("SOME REGRESSORS HAVE 0 NON-NA AND HAVE BEEN REMOVED")
+  }
+  
+  ## Add missing variable Indicators to Regressors and Instruments
+  
+  if (missing.include==1){
+    # identify missflag variables in regressors
+    missflag.vars <- paste0(regressors.valid[!grepl(":",regressors.valid)], ".missflag")
+    
+    # retain missflag variables if there are actually missing variables
+    dt[, temp_outcome:=dt[, outcome.var, with=FALSE]]
+    
+    miss.exist <- unlist(lapply(missflag.vars, function(x) length(unique(dt[!is.na(temp_outcome), x, with=FALSE][[1]]))==2))
+    
+    missflag.vars.valid <- missflag.vars[miss.exist]
+    
+    regressors.valid <- c(regressors.valid, missflag.vars.valid)
+    
+    # identify missing endogenous variables and instruments
+    missing.endog <- paste0(endog.vars[!grepl(":",endog.vars)], ".missflag")
+    missing.instrument <- paste0(instrument.vars[!grepl(":",instrument.vars)], ".missflag")
+    
+    endog.vars <- c(endog.vars, missing.endog)
+    instrument.vars <- c(instrument.vars, missing.instrument)
   }
   
   if (length(cluster.group)>0){
@@ -67,7 +106,7 @@ reg.IV <- function(dt, outcome.var, regressors, endog.vars, instrument.vars, fix
 
 # IV taking model spec object
 reg.IV.model.spec <- function(dt, model.spec){
-  reg.IV(dt, model.spec[[1]], model.spec[[2]], model.spec[[3]], model.spec[[4]], model.spec[[5]],  model.spec[[6]])
+  reg.IV(dt, model.spec[[1]], model.spec[[2]], model.spec[[3]], model.spec[[4]], model.spec[[5]],  model.spec[[6]], model.spec[[7]])
 }
 
 ######################################################################################################
@@ -77,12 +116,12 @@ reg.IV.model.spec <- function(dt, model.spec){
 estimate.model.spec <- function(dt, model.spec){
   
   # OLS
-  if (length(model.spec)==4){
+  if (length(model.spec)==5){
     model.out <- reg.OLS.model.spec(dt, model.spec)
   }
   
   # IV
-  if (length(model.spec)==6){
+  if (length(model.spec)==7){
     model.out <- reg.IV.model.spec(dt, model.spec)
   }
   
@@ -97,13 +136,13 @@ estimate.model.spec.list <- function(dt.list, model.spec.list){
   } else if (length(model.spec.list)==1) {
     out.list <- lapply(dt.list, estimate.model.spec, model.spec=model.spec.list[[1]])
   } else {
-    out.list <- mapply(estimate.model.spec, dt.list, model.spec.list)
+    out.list <- mapply(estimate.model.spec, dt.list, model.spec.list, SIMPLIFY=FALSE)
   }
   return(out.list)
 }
 
 # build model specification object
-build.model.spec <- function(outcome.var.list, regressor.list, fixed.effects.list=c(), cluster.list=c(), 
+build.model.spec <- function(outcome.var.list, regressor.list, fixed.effects.list=c(), cluster.list=c(), missing.include.list=c(), 
                              endog.var.list=c(), instrument.list=c()){
   
   model.spec.list <- list()
@@ -121,6 +160,10 @@ build.model.spec <- function(outcome.var.list, regressor.list, fixed.effects.lis
   
   if (length(fixed.effects.list)==1){
     fixed.effects.list <- rep(fixed.effects.list, n.models)
+  }
+  
+  if (length(missing.include.list)==1){
+    missing.include.list <- rep(missing.include.list, n.models)
   }
   
   if (length(cluster.list)==1){
@@ -141,13 +184,13 @@ build.model.spec <- function(outcome.var.list, regressor.list, fixed.effects.lis
     # package model spec for IV
     for (i in 1:n.models){
       model.spec.list[[i]] <- list(outcome.var.list[[i]], regressor.list[[i]], endog.var.list[[i]], instrument.list[[i]], 
-                                   fixed.effects.list[[i]], cluster.list[[i]])
+                                   fixed.effects.list[[i]], cluster.list[[i]], missing.include.list[[i]])
     }
     
   } else {
     # package model spec for OLS
     for (i in 1:n.models){
-      model.spec.list[[i]] <- list(outcome.var.list[[i]], regressor.list[[i]], fixed.effects.list[[i]], cluster.list[[i]])
+      model.spec.list[[i]] <- list(outcome.var.list[[i]], regressor.list[[i]], fixed.effects.list[[i]], cluster.list[[i]], missing.include.list[[i]])
     }
   }
   
@@ -157,7 +200,8 @@ build.model.spec <- function(outcome.var.list, regressor.list, fixed.effects.lis
 # combine regressors and interactions
 combine.reg.inter <- function(regressors, inter.1, inter.2){
   if (!is.null(inter.1)){
-    rhs.out <- c(regressors, paste0(inter.1,":",inter.2))
+    # rhs.out <- c(regressors, paste0(inter.1,":",inter.2))
+    rhs.out <- c(regressors, do.call(paste0, expand.grid(inter.1,":",inter.2)))
   } else {
     rhs.out <- regressors
   }
@@ -234,11 +278,11 @@ print.reg.out.auto.label <- function(model, auto.label.list, se=NULL, title="", 
   mult.discrete.covariate.labels <- auto.label.list[[5]]
   
   # generate length of covariates in each model
-  cov.length <- lapply(model, function(x) length(rownames(x$coefficients)))
+  # cov.length <- lapply(model, function(x) length(rownames(x$coefficients)))
   
   list.to.keep <- list()
   for (i in 1:length(model)){
-    list.to.keep[[i]] <- rownames(model[[i]]$coefficients)
+    list.to.keep[[i]] <- rownames(model[[i]]$coefficients)[!grepl(".missflag",rownames(model[[i]]$coefficients))]
   }
   list.to.keep <- setdiff(unique(unlist(list.to.keep)), c(omit.list, "(Intercept)"))
   
@@ -251,7 +295,7 @@ print.reg.out.auto.label <- function(model, auto.label.list, se=NULL, title="", 
   
   # print table
   print.reg.out(model, se=se, title=title, outcome.labels=outcome.labels, cov.labels=cov.labels, 
-                omit.list=paste0("^",omit.list,"$"), add.lines=add.lines, 
+                omit.list=paste0("^",omit.list,"$"), add.lines=add.lines,
                 file.name=file.name, file.path=file.path, font.size=font.size, single.row=single.row, no.space=no.space,
                 order=paste0("^\\b",list.to.keep,"$\\b"))
   
@@ -382,4 +426,42 @@ output.all.outcomes.single.model <- function(list.models.outcomes.title.file.fe,
                            omit.list=omit.list, file.name=paste0(title.prefix,list.models.outcomes.title.file.fe[[4]],".tex"), file.path=picDir,
                            add.lines=list.models.outcomes.title.file.fe[[5]], font.size=font.size, single.row=single.row, no.space=no.space, no.label=no.label)
 
+}
+
+# above outputting a tiny version too
+output.all.outcomes.single.model.tiny.too <- function(list.models.outcomes.title.file.fe, auto.label.covariate.object, title.prefix="model",
+                                             omit.list=NULL, picDir=NULL, single.row=FALSE, font.size="tiny", no.space=FALSE, no.label=0){
+  
+  # requested
+  output.all.outcomes.single.model(list.models.outcomes.title.file.fe, auto.label.covariate.object, title.prefix=title.prefix, 
+                                   omit.list=omit.list, picDir=picDir, single.row=single.row, font.size=font.size, no.space=no.space, no.label=no.label)
+  # tiny too
+  output.all.outcomes.single.model(list.models.outcomes.title.file.fe, auto.label.covariate.object, title.prefix=title.prefix, 
+                                   omit.list=omit.list, picDir=picDir, single.row=single.row, font.size="tiny", no.space=no.space, no.label=no.label)
+  
+}
+
+## Outputting Model from Silo
+
+# package model spec and felm model object for output
+package.for.output <- function(model.spec, felm.model){
+  
+  # return fixed effects
+  fixed.effects <- as.data.table(getfe(felm.model))
+  
+  # shrink size by nullifying attribute
+  attributes(fixed.effects)$ef <- NULL
+  
+  # gather attributes from felm object to keep
+  felm.objects <- list(felm.model$coefficients, felm.model$STATS[[1]])
+  
+  # package with model spec
+  out.list <- list(model.spec, felm.objects, fixed.effects)
+  
+  return(out.list)
+}
+
+# above taking list of model specs and list of felm objects
+package.for.output.list <- function(model.spec.list, felm.model.list){
+  out.list <- mapply(package.for.output, model.spec.list, felm.model.list, SIMPLIFY=FALSE)
 }
