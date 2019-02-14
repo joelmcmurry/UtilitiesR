@@ -395,7 +395,7 @@ sum.tab <- function(dt, var.name, var.label, invalid.vals=c(-1), time.invariant=
   unique.r.invalid <- unique(dt.for.tab[temp_col %in% invalid.vals, .(child_id_79)])
   count.unique.r.invalid <- nrow(unique.r.invalid)
   
-  tab[, var.name:=var.label]
+  tab[, var.name:=var.title]
   tab[, unique.r:=count.unique.r]
   tab[, unique.r.invalid:=count.unique.r.invalid]
   
