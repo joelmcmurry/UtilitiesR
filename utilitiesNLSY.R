@@ -395,7 +395,7 @@ sum.tab <- function(dt, var.name, var.label, invalid.vals=c(-1), time.invariant=
   unique.r.invalid <- unique(dt.for.tab[temp_col %in% invalid.vals, .(child_id_79)])
   count.unique.r.invalid <- nrow(unique.r.invalid)
   
-  tab[, var.name:=var.title]
+  tab[, var.name:=var.label]
   tab[, unique.r:=count.unique.r]
   tab[, unique.r.invalid:=count.unique.r.invalid]
   
@@ -537,15 +537,19 @@ sum.tab.min.max.age.mult.var <- function(dt, var.name.list){
 ## GeoCode
 
 # assign state randomly to NLSY respondents based on region for testing (no within-region migration)
-assign.state <- function(dt, dt.fips.region){
+assign.state <- function(dt, dt.fips.region, total.random.flag=0){
   # isolate unique list of (mother, region), ignore NA
   dt.mom.region <- unique(dt[!is.na(region), .(mom_id_79, region)])
   
   # for each region, draw N states (with replacement) where N is number of mother observations in that region
-  for (region.i in 1:4){
-    dt.mom.region[region==region.i, fips.draw:=sample(dt.fips.region[region==region.i, fips], nrow(dt.mom.region[region==region.i]), replace=TRUE)]
+  if (total.random.flag==0){
+    for (region.i in 1:4){
+      dt.mom.region[region==region.i, fips.draw:=sample(dt.fips.region[region==region.i, fips], nrow(dt.mom.region[region==region.i]), replace=TRUE)]
+    }
+  } else {
+    dt.mom.region[, fips.draw:=sample(dt.fips.region[, fips], nrow(dt.mom.region), replace=TRUE)]
   }
-  
+
   # merge back into NLSY dt
   setkey(dt, mom_id_79, region)
   setkey(dt.mom.region, mom_id_79, region)
