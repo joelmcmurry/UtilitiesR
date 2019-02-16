@@ -267,8 +267,8 @@ subset.time.varying <- function(dt, by.vars, vars.to.keep, vars.new.names=NULL, 
 
 # reshape number/loop variables, with one row per student/number variable/loop variable
 reshape.num.loop.97 <- function(dt, by.vars, num.vars.to.keep, num.vars.new.names=NULL, 
-                                  nest.loop.vars.to.keep, nest.loop.vars.new.names=NULL, by.vars.new.names=NULL,
-                                  num.var.name=NULL, loop.var.name=NULL){
+                                nest.loop.vars.to.keep, nest.loop.vars.new.names=NULL, by.vars.new.names=NULL,
+                                num.var.name=NULL, loop.var.name=NULL){
   
   ## Number Level Variables
   
@@ -372,7 +372,7 @@ reshape.num.loop.97 <- function(dt, by.vars, num.vars.to.keep, num.vars.new.name
 ## Data Summary
 
 # create table summarizing given variable
-sum.tab <- function(dt, var.name, var.label, invalid.vals=c(-1), time.invariant=0){
+sum.tab <- function(dt, var.name, var.title, invalid.vals=c(-1), time.invariant=0){
   
   if (time.invariant==0){
     dt.for.tab <- copy(dt) 

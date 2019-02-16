@@ -138,7 +138,7 @@ compute.mean.factor <- function(dt, y.var, factor.var){
   dt[, temp_factor_var:=dt[, factor.var, with=FALSE]]
   
   dt.mean <- dt[!is.na(temp_y_var) & !is.na(temp_factor_var), 
-                .(mean.by.factor=mean(temp_y_var)), by=.(temp_factor_var)]
+                .(mean.by.factor=mean(temp_y_var), std.dev.by.factor=var(temp_y_var)^0.5), by=.(temp_factor_var)]
   dt.mean[, variable:=factor.var]
   dt.mean[, value:=temp_factor_var]
   
@@ -256,4 +256,59 @@ plot.print.box.whisker.factor.list <- function(dt, picDir, input.list, no.print=
     print.object(plot, picDir, fileTitle=fileTitle)
   }
   
+}
+
+##########################################################################################################
+## Data Summary
+
+# create table summarizing given variable
+tab.sum.stats <- function(dt, var.name, var.title, by.vars, invalid.vals=c(-1), time.invariant=0){
+  
+  if (time.invariant==0){
+    dt.for.tab <- copy(dt) 
+  }
+  else if (time.invariant==1){
+    dt.for.tab <- copy(unique(dt[,c(by.vars, var.name), with=FALSE]))
+  }
+  
+  dt.for.tab[, temp_col:=dt.for.tab[,var.name, with=FALSE]]
+  
+  tab <- dt.for.tab[is.na(temp_col)==FALSE & !(temp_col %in% invalid.vals), .(mean=mean(temp_col, na.rm=TRUE),
+                                                                              median=as.numeric(median(temp_col, na.rm=TRUE)),
+                                                                              sd=var(temp_col, na.rm=TRUE)^0.5)]
+  
+  # count unique children used in calculation above
+  unique.r <- unique(dt.for.tab[is.na(temp_col)==FALSE & !(temp_col %in% invalid.vals), by.vars, with=FALSE])
+  count.unique.r <- nrow(unique.r)
+  
+  # count unique children with invalid values
+  unique.r.invalid <- unique(dt.for.tab[temp_col %in% invalid.vals, by.vars, with=FALSE])
+  count.unique.r.invalid <- nrow(unique.r.invalid)
+  
+  tab[, var.name:=var.title]
+  tab[, unique.r:=count.unique.r]
+  tab[, unique.r.invalid:=count.unique.r.invalid]
+  
+  return(tab)
+}
+
+# above stacking list of variables
+tab.sum.stats.mult.var <- function(dt, var.name.list, var.title.list, time.invariant.list, by.vars, invalid.vals.list=c(-1)){
+  
+  tab.var.list <- list()
+  
+  # if no list of invalid vals supplied, extend default
+  if (length(invalid.vals.list)==1){
+    for (i in 1:length(var.name.list)){
+      tab.var.list[[i]] <- tab.sum.stats(dt, var.name.list[[i]], var.title.list[[i]], by.vars, invalid.vals.list, time.invariant.list[[i]])
+    }
+  } else {
+    for (i in 1:length(var.name.list)){
+      tab.var.list[[i]] <- tab.sum.stats(dt, var.name.list[[i]], var.title.list[[i]], by.vars, invalid.vals.list[[i]], time.invariant.list[[i]])
+    }
+  }
+  
+  tab.var.stack <- do.call("rbind", tab.var.list)[order(var.name)]
+  
+  return(tab.var.stack)
 }
