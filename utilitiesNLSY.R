@@ -262,6 +262,43 @@ subset.time.varying <- function(dt, by.vars, vars.to.keep, vars.new.names=NULL, 
   
   return(dt.time.varying)
 }
+                                      
+                                      ## NLSY79 Loop Reshape
+
+# reshape child-specific variables, with one row per mother/child number/year
+reshape.child.loop.79 <- function(dt, by.vars, child.vars.to.keep, child.vars.new.names=NULL,
+                                  by.vars.new.names=NULL){
+  
+  # melt all child specific variables
+  dt.l <- melt(dt[,c(by.vars, get.cols(paste0("^",child.vars.to.keep,"\\.",collapse="|"),dt)),with=FALSE], by.vars)
+  
+  # coerce variable name to character
+  dt.l[,variable:=as.character(variable)]
+  
+  # extract variable name
+  dt.l[, var.name:=substr(variable,1,nchar(variable)-8)]
+  
+  # extract year
+  dt.l[, year:=substr(variable,nchar(variable)-3,nchar(variable))]
+  
+  # extract child number
+  dt.l[, child.num:=as.numeric(substr(variable,nchar(variable)-6,nchar(variable)-5))]
+  
+  # cast back 
+  dt.w <- dcast(dt.l, as.formula(paste(paste(c(by.vars,"year","child.num"),collapse="+"),"~ var.name")), value.var="value")
+  
+  # if prompted, assign new by variable names
+  if (!is.null(by.vars.new.names)){
+    setnames(dt.w, old=by.vars, new=by.vars.new.names)
+  }
+  
+  # if prompted, rename child variables and set column order
+  if (!is.null(child.vars.new.names)){
+    setnames(dt.w, old=child.vars.to.keep, new=child.vars.new.names)
+  }
+  
+  return(dt.w)
+}
 
 ## NLSY97 Loop Reshape
 
