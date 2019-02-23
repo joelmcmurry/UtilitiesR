@@ -262,8 +262,8 @@ subset.time.varying <- function(dt, by.vars, vars.to.keep, vars.new.names=NULL, 
   
   return(dt.time.varying)
 }
-
-## NLSY79 Loop Reshape
+                                      
+                                      ## NLSY79 Loop Reshape
 
 # reshape child-specific variables, with one row per mother/child number/year
 reshape.child.loop.79 <- function(dt, by.vars, child.vars.to.keep, child.vars.new.names=NULL,

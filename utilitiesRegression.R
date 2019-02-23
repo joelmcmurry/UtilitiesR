@@ -18,36 +18,37 @@ source("utilitiesMisc.R")
 ## Regressions - Streamlined
 
 # OLS
-reg.OLS <- function(dt, outcome.var, regressors, fixed.effects="0", cluster.group=c(), missing.include=0){
+reg.OLS <- function(dt, outcome.var, regressors, fixed.effects="0", cluster.group="0", missing.include=0, weight.var=NULL){
+  
+  # create copy of data
+  dt.for.reg <- copy(dt[, intersect(colnames(dt),c(outcome.var, regressors, fixed.effects, cluster.group, weight.var)), with=FALSE])
   
   # remove regressors if 0 non-NA and throw warning
-  regressors.valid <- regressors[unlist(lapply(regressors[!grepl(":",regressors)], var.nonmissing, dt=dt, non.missing.rows=1))]
+  regressors.valid <- regressors[unlist(lapply(regressors[!grepl(":",regressors)], var.nonmissing, dt=dt.for.reg[!is.na(get(outcome.var))], non.missing.rows=1))]
   if (length(regressors.valid)!=length(regressors)){
     warning("SOME REGRESSORS HAVE 0 NON-NA AND HAVE BEEN REMOVED")
   }
   
-  ## Add missing variable Indicators to Regressors
+  ## If Prompted, Replacing Select Missing Regressors with 0 and Add Missing Flag
   
   if (missing.include==1){
-    # identify missflag variables in regressors
-    missflag.vars <- paste0(regressors.valid[!grepl(":",regressors.valid)], ".missflag")
     
-    # retain missflag variables if there are actually missing variables
-    dt[, temp_outcome:=dt[, outcome.var, with=FALSE]]
-    
-    miss.exist <- unlist(lapply(missflag.vars, function(x) length(unique(dt[!is.na(temp_outcome), x, with=FALSE][[1]]))==2))
-    
-    missflag.vars.valid <- missflag.vars[miss.exist]
-    
-    regressors.valid <- c(regressors.valid, missflag.vars.valid)
   }
   
-  if (length(cluster.group)>0){
+  if (!is.null(weight.var)){
+    dt.for.reg[, temp_wt:=dt.for.reg[, weight.var, with=FALSE]]
+    
+    dt.nonmiss.wt <- dt.for.reg[!is.na(temp_wt)]
+    weights <- dt.nonmiss.wt$temp_wt
+    
     model <- felm(as.formula(paste(outcome.var,"~",paste(regressors.valid, collapse="+")," | ", paste(fixed.effects, collapse="+"),
-                                   "| 0 |", paste(cluster.group, collapse="+"))), data = dt)
+                                   "| 0 |", paste(cluster.group, collapse="+"))), data = dt.nonmiss.wt, weight=weights)
   } else {
-    model <- felm(as.formula(paste(outcome.var,"~",paste(regressors.valid, collapse="+")," | ", paste(fixed.effects, collapse="+"))), data = dt)
+    model <- felm(as.formula(paste(outcome.var,"~",paste(regressors.valid, collapse="+")," | ", paste(fixed.effects, collapse="+"),
+                                   "| 0 |", paste(cluster.group, collapse="+"))), data = dt.for.reg)
   }
+  
+  rm("dt.for.reg")
 
   return(model)
 
@@ -55,73 +56,126 @@ reg.OLS <- function(dt, outcome.var, regressors, fixed.effects="0", cluster.grou
 
 # OLS taking model spec object
 reg.OLS.model.spec <- function(dt, model.spec){
-  reg.OLS(dt, model.spec[[1]], model.spec[[2]], model.spec[[3]], model.spec[[4]], model.spec[[5]])
+  reg.OLS(dt, model.spec[[1]], model.spec[[2]], model.spec[[3]], model.spec[[4]], model.spec[[5]], model.spec[[6]])
 }
 
 # IV
-reg.IV <- function(dt, outcome.var, regressors, endog.vars, instrument.vars, fixed.effects="0", cluster.group=c(), missing.include=0){
+reg.IV <- function(dt, outcome.var, regressors, endog.vars, instruments, fixed.effects="0", cluster.group="0", missing.include=0, weight.var=NULL){
+  
+  # create copy of data
+  dt.for.reg <- copy(dt[, intersect(colnames(dt),c(outcome.var, regressors, endog.vars, instruments, fixed.effects, cluster.group, weight.var)), with=FALSE])
   
   # remove regressors if 0 non-NA and throw warning
-  regressors.valid <- regressors[unlist(lapply(regressors[!grepl(":",regressors)], var.nonmissing, dt=dt, non.missing.rows=1))]
+  regressors.valid <- regressors[unlist(lapply(regressors[!grepl(":",regressors)], var.nonmissing, dt=dt.for.reg[!is.na(get(outcome.var))], non.missing.rows=1))]
   if (length(regressors.valid)!=length(regressors)){
     warning("SOME REGRESSORS HAVE 0 NON-NA AND HAVE BEEN REMOVED")
   }
   
-  ## Add missing variable Indicators to Regressors and Instruments
+  ## If Prompted, Replacing Select Missing Regressors with 0 and Add Missing Flag
   
   if (missing.include==1){
-    # identify missflag variables in regressors
-    missflag.vars <- paste0(regressors.valid[!grepl(":",regressors.valid)], ".missflag")
     
-    # retain missflag variables if there are actually missing variables
-    dt[, temp_outcome:=dt[, outcome.var, with=FALSE]]
-    
-    miss.exist <- unlist(lapply(missflag.vars, function(x) length(unique(dt[!is.na(temp_outcome), x, with=FALSE][[1]]))==2))
-    
-    missflag.vars.valid <- missflag.vars[miss.exist]
-    
-    regressors.valid <- c(regressors.valid, missflag.vars.valid)
-    
-    # identify missing endogenous variables and instruments
-    missing.endog <- paste0(endog.vars[!grepl(":",endog.vars)], ".missflag")
-    missing.instrument <- paste0(instrument.vars[!grepl(":",instrument.vars)], ".missflag")
-    
-    endog.vars <- c(endog.vars, missing.endog)
-    instrument.vars <- c(instrument.vars, missing.instrument)
   }
   
-  if (length(cluster.group)>0){
-    model.tot <- felm(as.formula(paste(outcome.var,"~",paste(regressors.valid, collapse="+"),
+  if (!is.null(weight.var)){
+    dt.for.reg[, temp_wt:=dt.for.reg[, weight.var, with=FALSE]]
+    
+    dt.nonmiss.wt <- dt.for.reg[!is.na(temp_wt)]
+    weights <- dt.nonmiss.wt$temp_wt
+    
+    model <- felm(as.formula(paste(outcome.var,"~",paste(regressors.valid, collapse="+"),
                                        " | ", paste(fixed.effects, collapse="+"), "|",
-                                       "(", paste(endog.vars, collapse="|"), "~", paste(instrument.vars, collapse="+"), ")", 
-                                       "|", paste(cluster.group, collapse="+"))), data = dt)
+                                       "(", paste(endog.vars, collapse="|"), "~", paste(instruments, collapse="+"), ")", 
+                                       "|", paste(cluster.group, collapse="+"))), 
+                      data=dt.nonmiss.wt, weight=weights)
   } else {
-    model.tot <- felm(as.formula(paste(outcome.var,"~",paste(regressors.valid, collapse="+"),
+    model <- felm(as.formula(paste(outcome.var,"~",paste(regressors.valid, collapse="+"),
                                        " | ", paste(fixed.effects, collapse="+"), "|",
-                                       "(", paste(endog.vars, collapse="|"), "~", paste(instrument.vars, collapse="+"), ")")), data = dt)
+                                       "(", paste(endog.vars, collapse="|"), "~", paste(instruments, collapse="+"), ")", 
+                                       "|", paste(cluster.group, collapse="+"))), 
+                      data=dt.for.reg)
   }
   
-  return(model.tot)
+  rm("dt.for.reg")
+  
+  return(model)
 }
 
 # IV taking model spec object
 reg.IV.model.spec <- function(dt, model.spec){
-  reg.IV(dt, model.spec[[1]], model.spec[[2]], model.spec[[3]], model.spec[[4]], model.spec[[5]],  model.spec[[6]], model.spec[[7]])
+  reg.IV(dt, model.spec[[1]], model.spec[[2]], model.spec[[3]], model.spec[[4]], model.spec[[5]],  model.spec[[6]], model.spec[[7]], model.spec[[8]])
 }
 
 ######################################################################################################
 ## Auxiliary and Convenience
 
+# set missing regressors to zero and generate dummy for missing
+include.missing.regressors <- function(dt, regressors.to.include){
+  
+  # extract regressors without interactions
+  regressors.no.inter <- regressors.to.include[!grepl(":",regressors.to.include)]
+  
+  # for each regressor, set nonresponse to 0 and flag if missing
+  for (reg.var in regressors.no.inter){
+    dt <- recode.flag.na(dt, reg.var)
+  }
+  
+  # identify missflag variables in regressors
+  missflag.vars <- paste0(regressors.no.inter, ".missflag")
+  
+  # retain missflag variables if there are actually missing variables
+  dt[, temp_outcome:=dt[, outcome.var, with=FALSE]]
+  
+  missflag.vars.valid <- missflag.vars[unlist(lapply(missflag.vars, function(x) length(unique(dt[!is.na(temp_outcome), x, with=FALSE][[1]]))==2))]
+  
+  ## Create Interactions for All Interacted Variables with Missing Values
+  
+  if (length(grep(":",regressors))>0){
+    # find all interactions
+    inter.vars <- regressors.valid[grep(":",regressors.valid)]
+    
+    # find all interactions LHS
+    inter.vars.lhs <- unlist(lapply(inter.vars, function(x) substr(x, 1, regexpr(":",x)-1)))
+    
+    # find all interactions RHS
+    inter.vars.rhs <- unlist(lapply(inter.vars, function(x) substr(x, regexpr(":",x)+1, nchar(x))))
+    
+    # generate all combinations of LHS, RHS, with missing
+    inter.lhs.missflag <- paste0(paste0(inter.vars.lhs,".missflag"),":",inter.vars.rhs)
+    inter.rhs.missflag <- paste0(inter.vars.lhs,":",paste0(inter.vars.rhs,".missflag"))
+    inter.both.missflag <- paste0(paste0(inter.vars.lhs,".missflag"),":",paste0(inter.vars.rhs,".missflag"))
+    
+    # all.missflag.inter <- c(inter.lhs.missflag, inter.rhs.missflag, inter.both.missflag)
+    all.missflag.inter <- c(inter.lhs.missflag, inter.rhs.missflag)
+    
+    # # find all interactions whose base variable has a valid missflag
+    # inter.vars.with.valid.missflag <- inter.vars[grep(paste0(gsub(".missflag","",missflag.vars.valid),collapse="|"), inter.vars)]
+    # 
+    # # create interaction with missflag
+    # inter.valid.missflag <- gsub(":",".missflag:", inter.vars.with.valid.missflag)
+    
+    # add to regressors
+    regressors.to.include <- c(regressors.to.include, missflag.vars.valid, all.missflag.inter)
+  } else {
+    regressors.to.include <- c(regressors.to.include, missflag.vars.valid)
+  }
+  
+  # package dataset and regressors for output
+  out.list <- list(dt, regressors.to.include)
+  
+  return(out.list)
+}
+
 # estimation function that detects whether to estimate with OLS or IV
 estimate.model.spec <- function(dt, model.spec){
   
   # OLS
-  if (length(model.spec)==5){
+  if (length(model.spec)==6){
     model.out <- reg.OLS.model.spec(dt, model.spec)
   }
   
   # IV
-  if (length(model.spec)==7){
+  if (length(model.spec)==8){
     model.out <- reg.IV.model.spec(dt, model.spec)
   }
   
@@ -142,7 +196,7 @@ estimate.model.spec.list <- function(dt.list, model.spec.list){
 }
 
 # build model specification object
-build.model.spec <- function(outcome.var.list, regressor.list, fixed.effects.list=c(), cluster.list=c(), missing.include.list=c(), 
+build.model.spec <- function(outcome.var.list, regressor.list, fixed.effects.list=c(), cluster.list=c(), missing.include.list=c(), weight.var.list=NULL,
                              endog.var.list=c(), instrument.list=c()){
   
   model.spec.list <- list()
@@ -170,6 +224,10 @@ build.model.spec <- function(outcome.var.list, regressor.list, fixed.effects.lis
     cluster.list <- rep(cluster.list, n.models)
   }
   
+  if (length(weight.var.list)==1){
+    weight.var.list <- rep(weight.var.list, n.models)
+  }
+  
   # IV specific
   if (length(instrument.list)!=0){
     
@@ -184,13 +242,13 @@ build.model.spec <- function(outcome.var.list, regressor.list, fixed.effects.lis
     # package model spec for IV
     for (i in 1:n.models){
       model.spec.list[[i]] <- list(outcome.var.list[[i]], regressor.list[[i]], endog.var.list[[i]], instrument.list[[i]], 
-                                   fixed.effects.list[[i]], cluster.list[[i]], missing.include.list[[i]])
+                                   fixed.effects.list[[i]], cluster.list[[i]], missing.include.list[[i]], weight.var.list[[i]])
     }
     
   } else {
     # package model spec for OLS
     for (i in 1:n.models){
-      model.spec.list[[i]] <- list(outcome.var.list[[i]], regressor.list[[i]], fixed.effects.list[[i]], cluster.list[[i]], missing.include.list[[i]])
+      model.spec.list[[i]] <- list(outcome.var.list[[i]], regressor.list[[i]], fixed.effects.list[[i]], cluster.list[[i]], missing.include.list[[i]], weight.var.list[[i]])
     }
   }
   
