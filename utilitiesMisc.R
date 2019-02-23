@@ -98,14 +98,15 @@ recode.flag.na <- function(dt, var.name){
 
 # lag variable
 lag.var <- function(dt, var.name, type="lag", n=1, by.vars){
-  
-  setkeyv(dt, cols=c(by.vars,"year"))
-  dt[, temp_col:=dt[, var.name, with=FALSE]]
-  
-  # lag var
-  dt[, (paste0(var.name,".",type,".",n)):=shift(temp_col, type=type, n=n), by=by.vars]
-  
-  dt[, temp_col:=NULL]
+  if (n>0){
+    setkeyv(dt, cols=c(by.vars,"year"))
+    dt[, temp_col:=dt[, var.name, with=FALSE]]
+    
+    # lag var
+    dt[, (paste0(var.name,".",type,".",n)):=shift(temp_col, type=type, n=n), by=by.vars]
+    
+    dt[, temp_col:=NULL]
+  }
 }
 
 # log variable
