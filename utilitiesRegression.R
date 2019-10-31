@@ -298,6 +298,22 @@ create.inter <- function(dt, var.1, var.2){
   
 }
 
+# return OLS coefficient and SE by variable name
+return.coef.se <- function(model, var.name, vcv.cluster=0){
+  
+  coef <- model$coefficients[rownames(model$coefficients)==var.name]
+  
+  if (vcv.cluster==1){
+    se <- model$clustervcv[rownames(model$clustervcv)==var.name,colnames(model$clustervcv)==var.name]^0.5
+  } else {
+    se <- model$vcv[rownames(model$vcv)==var.name,colnames(model$vcv)==var.name]^0.5
+  }
+  
+  out.list <- list(coef,se)
+  
+  return(out.list)
+}
+
 ######################################################################################################
 ## Regression Output
 

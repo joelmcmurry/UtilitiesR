@@ -263,7 +263,7 @@ subset.time.varying <- function(dt, by.vars, vars.to.keep, vars.new.names=NULL, 
   return(dt.time.varying)
 }
                                       
-                                      ## NLSY79 Loop Reshape
+## NLSY79 Loop Reshape
 
 # reshape child-specific variables, with one row per mother/child number/year
 reshape.child.loop.79 <- function(dt, by.vars, child.vars.to.keep, child.vars.new.names=NULL,
@@ -279,7 +279,7 @@ reshape.child.loop.79 <- function(dt, by.vars, child.vars.to.keep, child.vars.ne
   dt.l[, var.name:=substr(variable,1,nchar(variable)-8)]
   
   # extract year
-  dt.l[, year:=substr(variable,nchar(variable)-3,nchar(variable))]
+  dt.l[, year:=as.numeric(substr(variable,nchar(variable)-3,nchar(variable)))]
   
   # extract child number
   dt.l[, child.num:=as.numeric(substr(variable,nchar(variable)-6,nchar(variable)-5))]
