@@ -59,7 +59,7 @@ assign.var.label <- function(tab, var.label.lookup){
 
 # print stargazer table
 print.tab <- function(tab, cols.to.keep, col.labels, title, font.size="small", width="5pt", digits=2, colTypes=NULL, align=NULL, picDir=NULL, outFile="noPrint", 
-                      notes="Notes:", note.width="0.8\\textwidth", dalign=TRUE){
+                      notes="Notes:", note.width="0.8\\textwidth", dalign=TRUE, type = "latex"){
   
   # change column types
   if (!is.null(colTypes)){
@@ -70,7 +70,7 @@ print.tab <- function(tab, cols.to.keep, col.labels, title, font.size="small", w
   
   tab.out <- capture.output(stargazer(tab[,cols.to.keep, with=FALSE], summary=FALSE, title=title,
                                       covariate.labels  = col.labels, rownames=FALSE, font.size=font.size, 
-                                      type="latex", header=FALSE, column.sep.width=width, digits=digits, 
+                                      type=type, header=FALSE, column.sep.width=width, digits=digits, 
                                       notes="NOTES", notes.align="l", align=dalign))
   
   tab.out[grepl("NOTES",tab.out)] <- paste0("\\multicolumn{",length(cols.to.keep), "}{l} {\\parbox[t]{",note.width,"}{ \\textit{Notes: }", notes, "}} \\\\")
@@ -393,6 +393,45 @@ binScatter <- function(dt, x.var, y.var, regressors=NULL, n.buckets=20, x.var.ti
   if (!is.null(regressors)){
     x.resid <- lm(as.formula(paste(x.var,"~",paste(regressors,collapse="+"))), data=dt.nonmiss)$residuals
     y.resid <- lm(as.formula(paste(y.var,"~",paste(regressors,collapse="+"))), data=dt.nonmiss)$residuals
+  } else {
+    x.resid <- dt[, x.var, with=FALSE]
+    y.resid <- dt[, y.var, with=FALSE]
+  }
+  
+  dt.nonmiss[, x.residuals:=x.resid]
+  dt.nonmiss[, y.residuals:=y.resid]
+  
+  dt.nonmiss[, row.id:=.I]
+  
+  # bucket x-residuals into quantiles
+  dt.nonmiss <- flag.quantile(dt.nonmiss, "x.residuals", "row.id", quantile.n=n.buckets, tag.median=FALSE)
+  dt.nonmiss[, x.residuals.quantile:=dt.nonmiss[, paste0("x.residuals.quantile",n.buckets), with=FALSE]]
+  
+  # compute conditional average y-residual
+  cond.avg.y.resid <- dt.nonmiss[, .(avg.y.residual=mean(y.residuals,na.rm=TRUE)), by=.(x.residuals.quantile)]
+  cond.avg.y.resid[, x.residuals.quantile:=as.numeric(x.residuals.quantile)]
+  
+  # plot
+  plot <- ggplot(cond.avg.y.resid, aes(x=x.residuals.quantile, y=avg.y.residual)) + 
+    geom_point() + geom_smooth(method="lm", se=FALSE, col="black") + 
+    xlab(paste0(x.var.title," Residuals")) + ylab(paste0(y.var.title," Residuals")) +   
+    labs(title="") + 
+    theme_bw() + theme(legend.title=element_blank()) + 
+    theme(legend.position = "bottom")
+  print(plot)
+  
+}
+
+binScatter.wtd <- function(dt, x.var, y.var, wt.var, regressors=NULL, n.buckets=20, x.var.title=NULL, y.var.title=NULL){
+  
+  # retain non-missing rows only
+  dt.nonmiss <- na.omit(dt, unique(c(x.var, y.var, regressors, wt.var)))[, unique(c(x.var,y.var,regressors, wt.var)), with=FALSE]
+  
+  weights <- dt.nonmiss[, wt.var]
+  
+  if (!is.null(regressors)){
+    x.resid <- lm(as.formula(paste(x.var,"~",paste(regressors,collapse="+"))), weights = weights, data=dt.nonmiss)$residuals
+    y.resid <- lm(as.formula(paste(y.var,"~",paste(regressors,collapse="+"))), weights = weights, data=dt.nonmiss)$residuals
   } else {
     x.resid <- dt[, x.var, with=FALSE]
     y.resid <- dt[, y.var, with=FALSE]
